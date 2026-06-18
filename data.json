@@ -1,9 +1,740 @@
 {
-  "players": [],
+  "players": [
+    "Malek",
+    "Adnan",
+    "Mahmoud",
+    "Khaled",
+    "Belal",
+    "Louay",
+    "Omar",
+    "Samer",
+    "Hussein",
+    "Ayman",
+    "Mohamad"
+  ],
   "unlocked": false,
   "qualActual": {},
   "thirdsActual": [],
   "koResults": {},
   "twActual": "",
-  "predictions": {}
+  "predictions": {
+    "Mohamad": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Canada",
+          "Switzerland"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Germany",
+          "Ivory Coast"
+        ],
+        "F": [
+          "Netherlands",
+          "Sweden"
+        ],
+        "G": [
+          "Belgium",
+          "Iran"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Senegal"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "",
+        "B": "",
+        "D": "Türkiye",
+        "E": "Ecuador",
+        "I": "Norway",
+        "H": "",
+        "G": "Egypt",
+        "F": "Japan",
+        "L": "Ghana",
+        "C": "Scotland",
+        "K": "Congo DR"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Malek": {
+      "qual": {
+        "A": [
+          "South Korea",
+          "Mexico"
+        ],
+        "B": [
+          "Canada",
+          "Switzerland"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Ecuador",
+          "Germany"
+        ],
+        "F": [
+          "Netherlands",
+          "Japan"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Algeria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "Croatia",
+          "England"
+        ]
+      },
+      "thirds": {
+        "E": "Ivory Coast",
+        "B": "Bosnia-Herzegovina",
+        "A": "Czechia",
+        "F": "Sweden",
+        "I": "Senegal",
+        "L": "Ghana",
+        "D": "Paraguay",
+        "C": "Scotland"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Adnan": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Bosnia-Herzegovina"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Germany",
+          "Ivory Coast"
+        ],
+        "F": [
+          "Netherlands",
+          "Tunisia"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "Czechia",
+        "B": "Canada",
+        "C": "Scotland",
+        "D": "Türkiye",
+        "F": "Sweden",
+        "G": "New Zealand",
+        "H": "",
+        "I": "Senegal",
+        "J": "Algeria"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Khaled": {
+      "qual": {
+        "A": [
+          "South Korea",
+          "Czechia"
+        ],
+        "B": [
+          "Bosnia-Herzegovina",
+          "Switzerland"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "Australia",
+          "Türkiye"
+        ],
+        "E": [
+          "Germany",
+          "Ecuador"
+        ],
+        "F": [
+          "Netherlands",
+          "Japan"
+        ],
+        "G": [
+          "Belgium",
+          "Iran"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Senegal"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "Mexico",
+        "B": "Qatar",
+        "C": "Scotland",
+        "D": "USA",
+        "E": "Ivory Coast",
+        "F": "Sweden",
+        "G": "Egypt",
+        "H": "Saudi Arabia"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Ayman": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Canada",
+          "Switzerland"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "Türkiye",
+          "USA"
+        ],
+        "E": [
+          "Germany",
+          "Ecuador"
+        ],
+        "F": [
+          "Netherlands",
+          "Japan"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Senegal"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Colombia",
+          "Portugal"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "Czechia",
+        "B": "Bosnia-Herzegovina",
+        "C": "Scotland",
+        "D": "Australia",
+        "E": "Ivory Coast",
+        "F": "Sweden",
+        "G": "Iran",
+        "H": "Saudi Arabia"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Louay": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Qatar"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "Türkiye",
+          "USA"
+        ],
+        "E": [
+          "Germany",
+          "Ecuador"
+        ],
+        "F": [
+          "Netherlands",
+          "Japan"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "L": "Ghana",
+        "J": "Algeria",
+        "I": "Senegal",
+        "F": "Sweden",
+        "B": "Canada",
+        "A": "Czechia",
+        "D": "Australia",
+        "H": "Saudi Arabia"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Mahmoud": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Canada"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Germany",
+          "Ivory Coast"
+        ],
+        "F": [
+          "Sweden",
+          "Japan"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Uruguay",
+          "Spain"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Colombia",
+          "Portugal"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "Czechia",
+        "B": "",
+        "C": "Scotland",
+        "D": "Türkiye",
+        "E": "Ecuador",
+        "F": "Netherlands",
+        "G": "Iran",
+        "H": "Saudi Arabia",
+        "L": "Ghana"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Omar": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Qatar"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Türkiye"
+        ],
+        "E": [
+          "Germany",
+          "Ivory Coast"
+        ],
+        "F": [
+          "Netherlands",
+          "Sweden"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Senegal"
+        ],
+        "J": [
+          "Argentina",
+          "Algeria"
+        ],
+        "K": [
+          "Portugal",
+          "Uzbekistan"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "Czechia",
+        "B": "Canada",
+        "C": "Scotland",
+        "D": "Australia",
+        "E": "Ecuador",
+        "F": "Japan",
+        "G": "Iran",
+        "H": "Saudi Arabia"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Belal": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Canada",
+          "Qatar"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Paraguay"
+        ],
+        "E": [
+          "Germany",
+          "Ecuador"
+        ],
+        "F": [
+          "Japan",
+          "Netherlands"
+        ],
+        "G": [
+          "Belgium",
+          "Egypt"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Algeria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "A": "South Africa",
+        "B": "Switzerland",
+        "C": "Scotland",
+        "D": "Australia",
+        "E": "Curaçao",
+        "G": "New Zealand",
+        "H": "Saudi Arabia",
+        "I": "Senegal"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Hussein": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Canada"
+        ],
+        "C": [
+          "Brazil",
+          "Morocco"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Germany",
+          "Ivory Coast"
+        ],
+        "F": [
+          "Netherlands",
+          "Sweden"
+        ],
+        "G": [
+          "Belgium",
+          "Iran"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Senegal"
+        ],
+        "J": [
+          "Argentina",
+          "Austria"
+        ],
+        "K": [
+          "Portugal",
+          "Colombia"
+        ],
+        "L": [
+          "England",
+          "Ghana"
+        ]
+      },
+      "thirds": {
+        "A": "Czechia",
+        "B": "",
+        "C": "Scotland",
+        "D": "TÃ¼rkiye",
+        "E": "Ecuador",
+        "F": "Japan",
+        "G": "Egypt",
+        "H": "",
+        "J": "Algeria",
+        "L": "Croatia"
+      },
+      "ko": {},
+      "tw": ""
+    },
+    "Samer": {
+      "qual": {
+        "A": [
+          "Mexico",
+          "South Korea"
+        ],
+        "B": [
+          "Switzerland",
+          "Canada"
+        ],
+        "C": [
+          "Morocco",
+          "Brazil"
+        ],
+        "D": [
+          "USA",
+          "Australia"
+        ],
+        "E": [
+          "Germany",
+          "Ecuador"
+        ],
+        "F": [
+          "Netherlands",
+          "Japan"
+        ],
+        "G": [
+          "Egypt",
+          "Belgium"
+        ],
+        "H": [
+          "Spain",
+          "Uruguay"
+        ],
+        "I": [
+          "France",
+          "Norway"
+        ],
+        "J": [
+          "Argentina",
+          "Algeria"
+        ],
+        "K": [
+          "Colombia",
+          "Portugal"
+        ],
+        "L": [
+          "England",
+          "Croatia"
+        ]
+      },
+      "thirds": {
+        "L": "Ghana",
+        "I": "Senegal",
+        "F": "Sweden",
+        "E": "Ivory Coast",
+        "D": "Türkiye",
+        "A": "Czechia",
+        "B": "Qatar",
+        "C": "Scotland"
+      },
+      "ko": {},
+      "tw": ""
+    }
+  },
+  "playerPasswords": {
+    "Mohamad": "WorldCupPassword@123",
+    "Khaled": "khaled",
+    "Samer": "Fifa1",
+    "Belal": "1234",
+    "Hussein": "hussein"
+  }
 }

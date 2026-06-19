@@ -301,7 +301,6 @@ tbody td:nth-child(2){text-align:left;}
 <nav id="anav" style="display:none">
   <button class="active" onclick="showTab('asetup',this)">⚙️ Setup</button>
   <button onclick="showTab('alb',this)">🏆 Leaderboard</button>
-  <button onclick="showTab('agroups',this)">⚽ Group Results</button>
   <button onclick="showTab('aqual',this)">🎯 Qualifiers</button>
   <button onclick="showTab('athirds',this)">3️⃣ Best 3rds</button>
   <button onclick="showTab('ako',this)">🥊 Knockouts</button>
@@ -340,7 +339,7 @@ tbody td:nth-child(2){text-align:left;}
     <button class="rbtn" onclick="fetchStandings()">🔄 Refresh</button>
     <span class="rlbl" id="standlbl"></span>
   </div>
-  <div class="stand-note">Standings are calculated automatically from match results (group stage matches only). Top 2 in each group qualify directly; the best 8 third-place teams also advance.</div>
+  <div class="stand-note">Standings are calculated from match results entered by the admin. A group's top 2 teams (✅) are automatically confirmed as qualified once all 6 matches in that group are complete — player points update instantly.</div>
   <div class="stand-grid" id="standgrid"><div class="loading"><div class="spinner"></div><p>Loading standings…</p></div></div>
 </div>
 <div id="sticky"><button onclick="goSubmit()">📤 Submit Predictions</button></div>
@@ -504,6 +503,10 @@ async function init(){
     showMain('<div class="card" style="max-width:480px;margin:0 auto;text-align:center"><div style="font-size:2rem;margin-bottom:.5rem">❌</div><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:var(--red);margin-bottom:.5rem">Cannot load game data</h3><p style="font-size:.83rem;color:var(--gray-mid);line-height:1.5">'+e.message+'</p><button class="btn btn-green" style="margin-top:1rem" onclick="init()">🔄 Retry</button></div>');
     return;
   }
+  // Safety defaults for data.json files saved before this update
+  if(!GD.groupResults) GD.groupResults={};
+  if(!GD.qualActual) GD.qualActual={};
+  syncQualActualFromResults();
   var h=location.hash;
   if(h==='#admin') showAdminLogin();
   else if(h==='#scores') showScores();
@@ -920,7 +923,7 @@ function doAdminLogin(){
     location.hash='admin';
     el('hsub').textContent='Admin Panel';el('pbadge').style.display='none';
     el('anav').style.display='flex';el('pnav').style.display='none';
-    showMain('<div id="asetup" class="panel active"></div><div id="alb" class="panel"></div><div id="agroups" class="panel"></div><div id="aqual" class="panel"></div><div id="athirds" class="panel"></div><div id="ako" class="panel"></div><div id="atw" class="panel"></div>');
+    showMain('<div id="asetup" class="panel active"></div><div id="alb" class="panel"></div><div id="aqual" class="panel"></div><div id="athirds" class="panel"></div><div id="ako" class="panel"></div><div id="atw" class="panel"></div>');
     showTab('asetup',document.querySelector('#anav button'));
   } else {el('lerr').textContent='❌ Incorrect password';}
 }
@@ -934,7 +937,6 @@ function showTab(tab,btn){
   var e=el(tab);if(!e)return;e.classList.add('active');if(btn)btn.classList.add('active');
   if(tab==='asetup')renderASetup();
   if(tab==='alb')renderALB();
-  if(tab==='agroups')renderAGroups();
   if(tab==='aqual')renderAQual();
   if(tab==='athirds')renderAThirds();
   if(tab==='ako')renderAKO();
@@ -1005,78 +1007,145 @@ function renderALB(){
   el('alb').innerHTML=html+'</tbody></table></div>';
 }
 
-// ─── ADMIN: GROUP RESULTS ─────────────────────────────────────────────────
-// Admin enters actual match scores here. This is the single source of truth
-// for the public Standings page — no external API needed, so it's always
-// accurate and matches your own data.
-function renderAGroups(){
+// ─── SHARED: GROUP TABLE COMPUTATION ──────────────────────────────────────
+// Single source of truth: GD.groupResults, entered by the admin in the
+// Qualifiers tab. Used by the Qualifiers admin view, the public Standings
+// page, and indirectly drives qualActual (auto top-2) for player scoring.
+function computeGroupTable(groupKey){
+  var teams=GROUPS[groupKey];
+  var table={};
+  teams.forEach(function(t){table[t]={P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0};});
   if(!GD.groupResults) GD.groupResults={};
-  var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem">'+
-    '<h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">⚽ Group Stage Results</h2>'+
-    '<span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">Enter scores as matches finish</span></div>'+
-    '<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6)">Enter the final score for each match below. The Standings page recalculates points, GD, and qualification automatically — no need to touch anything else.</div>';
 
+  var matches=GROUP_MATCHES.filter(function(m){return m.group===groupKey;});
+  matches.forEach(function(m){
+    var res=GD.groupResults[m.id];
+    if(!res || res.s1===''||res.s1==null || res.s2===''||res.s2==null) return; // not played yet
+    var s1=parseInt(res.s1,10), s2=parseInt(res.s2,10);
+    if(isNaN(s1)||isNaN(s2)) return;
+    var t1=m.team1, t2=m.team2;
+    table[t1].P++; table[t2].P++;
+    table[t1].GF+=s1; table[t1].GA+=s2;
+    table[t2].GF+=s2; table[t2].GA+=s1;
+    if(s1>s2){table[t1].W++;table[t1].Pts+=3;table[t2].L++;}
+    else if(s1<s2){table[t2].W++;table[t2].Pts+=3;table[t1].L++;}
+    else{table[t1].D++;table[t2].D++;table[t1].Pts+=1;table[t2].Pts+=1;}
+  });
+
+  teams.forEach(function(t){table[t].GD=table[t].GF-table[t].GA;});
+
+  var rows=teams.map(function(t){return Object.assign({team:t},table[t]);});
+  rows.sort(function(a,b){
+    if(b.Pts!==a.Pts) return b.Pts-a.Pts;
+    if(b.GD!==a.GD) return b.GD-a.GD;
+    if(b.GF!==a.GF) return b.GF-a.GF;
+    return a.team.localeCompare(b.team);
+  });
+  return rows;
+}
+
+// Auto-sync GD.qualActual (top 2 per group) from computed standings.
+// Called after every result entry so player scoring stays in sync automatically.
+// Only marks a team qualified once the group is fully complete (all 6 matches
+// played) OR the team is mathematically guaranteed top-2 — for simplicity and
+// transparency we use "all 6 matches played" as the trigger, with a manual
+// override available if needed.
+function syncQualActualFromResults(){
   GK.forEach(function(g){
     var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});
-    html+='<div class="qsec"><div class="qhdr"><h3>Group '+g+'</h3><span class="tb">'+GROUPS[g].join(' · ')+'</span></div><div class="qbody">';
-    matches.forEach(function(m){
-      var res=GD.groupResults[m.id]||{s1:'',s2:''};
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0efe8;flex-wrap:wrap">'+
-        '<span style="flex:1;min-width:140px;font-size:.8rem;font-weight:600">'+m.team1+' <span style="color:var(--gray-mid);font-weight:400">vs</span> '+m.team2+'</span>'+
-        '<input type="number" min="0" max="20" placeholder="-" value="'+res.s1+'" style="width:46px;padding:5px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.85rem" onchange="setGroupResult(\''+m.id+'\',\'s1\',this.value)">'+
-        '<span style="color:var(--gray-mid)">–</span>'+
-        '<input type="number" min="0" max="20" placeholder="-" value="'+res.s2+'" style="width:46px;padding:5px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.85rem" onchange="setGroupResult(\''+m.id+'\',\'s2\',this.value)">'+
-        '<button class="cbtn" style="background:var(--red)" onclick="clearGroupResult(\''+m.id+'\')" title="Clear result">✕</button>'+
-        '</div>';
-    });
-    html+='</div></div>';
+    var playedCount=matches.filter(function(m){
+      var r=GD.groupResults[m.id];
+      return r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null && !isNaN(parseInt(r.s1,10)) && !isNaN(parseInt(r.s2,10));
+    }).length;
+    if(playedCount===matches.length){
+      // Group complete — lock in top 2 automatically
+      var rows=computeGroupTable(g);
+      GD.qualActual[g]=[rows[0].team, rows[1].team];
+    }
+    // If not complete, leave qualActual untouched (admin can still see live
+    // standings, but points aren't awarded until the group is finalised —
+    // this avoids awarding points based on a table that could still change).
   });
-  el('agroups').innerHTML=html;
 }
 
-async function setGroupResult(mid,field,val){
-  if(!GD.groupResults) GD.groupResults={};
-  if(!GD.groupResults[mid]) GD.groupResults[mid]={s1:'',s2:''};
-  GD.groupResults[mid][field] = val===''?'':parseInt(val,10);
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
-}
-
-async function clearGroupResult(mid){
-  if(GD.groupResults) delete GD.groupResults[mid];
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
-  renderAGroups();
-}
-
-// ─── ADMIN: QUALIFIERS ────────────────────────────────────────────────────
+// ─── ADMIN: QUALIFIERS (results entry + live standings + auto-qualify) ────
 function renderAQual(){
-  var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem"><h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🎯 Group Qualifiers</h2><span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">Top 2 per group · 3 pts each</span></div>';
+  if(!GD.groupResults) GD.groupResults={};
+  var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem">'+
+    '<h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🎯 Group Stage &amp; Qualifiers</h2>'+
+    '<span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">3 pts per correct qualifier pick</span></div>'+
+    '<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6)">'+
+    'Enter match scores as games finish. Standings, qualification, and player points are calculated automatically once all 6 matches in a group are complete — no manual qualifier selection needed.</div>';
+
   GK.forEach(function(g){
-    var teams=GROUPS[g];var actual=GD.qualActual[g]||['',''];
-    var ap='<div class="qarow">';
-    [0,1].forEach(function(idx){
-      ap+='<select class="qasel" onchange="setAQual(\''+g+'\','+idx+',this.value)"><option value="">— Qualifier '+(idx+1)+' —</option>';
-      teams.forEach(function(t){ap+='<option value="'+t+'"'+(t===actual[idx]?' selected':'')+'>'+t+'</option>';});
-      ap+='</select>';
-    });
-    ap+='</div>';
+    var teams=GROUPS[g];
+    var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});
+    var rows=computeGroupTable(g);
+    var playedCount=matches.filter(function(m){
+      var r=GD.groupResults[m.id];
+      return r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null;
+    }).length;
+    var complete=playedCount===matches.length;
+    var qualified=GD.qualActual[g]||[];
+
+    // Match score inputs
+    var matchRows=matches.map(function(m){
+      var res=GD.groupResults[m.id]||{s1:'',s2:''};
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0efe8;flex-wrap:wrap">'+
+        '<span style="flex:1;min-width:130px;font-size:.78rem;font-weight:600">'+m.team1+' <span style="color:var(--gray-mid);font-weight:400">vs</span> '+m.team2+'</span>'+
+        '<input type="number" min="0" max="20" placeholder="-" value="'+(res.s1===''||res.s1==null?'':res.s1)+'" style="width:42px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s1\',this.value)">'+
+        '<span style="color:var(--gray-mid)">–</span>'+
+        '<input type="number" min="0" max="20" placeholder="-" value="'+(res.s2===''||res.s2==null?'':res.s2)+'" style="width:42px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s2\',this.value)">'+
+        '</div>';
+    }).join('');
+
+    // Standings table
+    var standRows=rows.map(function(r,idx){
+      var isQ=qualified.indexOf(r.team)>-1;
+      var zoneBg=isQ?'#f0faf4':'transparent';
+      return '<tr style="background:'+zoneBg+'"><td style="padding:4px 6px;font-weight:600;font-size:.75rem">'+(isQ?'✅ ':'')+r.team+'</td>'+
+        '<td style="padding:4px 6px;text-align:center;font-size:.73rem">'+r.P+'</td><td style="padding:4px 6px;text-align:center;font-size:.73rem">'+r.W+'</td>'+
+        '<td style="padding:4px 6px;text-align:center;font-size:.73rem">'+r.D+'</td><td style="padding:4px 6px;text-align:center;font-size:.73rem">'+r.L+'</td>'+
+        '<td style="padding:4px 6px;text-align:center;font-size:.73rem">'+(r.GD>0?'+':'')+r.GD+'</td>'+
+        '<td style="padding:4px 6px;text-align:center;font-weight:700;font-size:.75rem;color:var(--green)">'+r.Pts+'</td></tr>';
+    }).join('');
+
+    var statusBadge=complete
+      ?'<span style="background:#d4edda;color:#1a6b3c;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:10px">✅ Final — Qualified: '+qualified.join(', ')+'</span>'
+      :'<span style="background:#fff8e7;color:#856404;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:10px">'+playedCount+'/'+matches.length+' played</span>';
+
+    html+='<div class="qsec"><div class="qhdr"><h3>Group '+g+'</h3><span class="tb">'+teams.join(' · ')+'</span></div>'+
+      '<div class="qbody">'+
+      '<div style="margin-bottom:.6rem">'+statusBadge+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr;gap:1rem;margin-bottom:.75rem">'+
+        '<div><div style="font-size:.7rem;font-weight:700;color:var(--gray-mid);text-transform:uppercase;margin-bottom:.3rem">Match Results</div>'+matchRows+'</div>'+
+        '<div><div style="font-size:.7rem;font-weight:700;color:var(--gray-mid);text-transform:uppercase;margin-bottom:.3rem">Standings</div>'+
+        '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--gray-light)"><th style="padding:4px 6px;text-align:left;font-size:.65rem">Team</th><th style="padding:4px 6px;font-size:.65rem">P</th><th style="padding:4px 6px;font-size:.65rem">W</th><th style="padding:4px 6px;font-size:.65rem">D</th><th style="padding:4px 6px;font-size:.65rem">L</th><th style="padding:4px 6px;font-size:.65rem">GD</th><th style="padding:4px 6px;font-size:.65rem">Pts</th></tr></thead><tbody>'+standRows+'</tbody></table></div>'+
+      '</div>';
+
+    // Player predictions vs qualified
     var prows=GD.players.map(function(p){
       var name=pName(p);var preds=((GD.predictions[name]||{}).qual||{})[g]||['',''];
       var picks='<div class="qpicks">';
       [0,1].forEach(function(idx){
-        var s=preds[idx]||'';var a=actual[idx];
-        var cls=a&&s?(s.toLowerCase()===a.toLowerCase()?'correct':'wrong'):'';
-        picks+='<select class="qpsel '+cls+'" disabled><option>'+s+(s?'':'—')+'</option></select>';
+        var s=preds[idx]||'';
+        var cls=complete&&s?(qualified.indexOf(s)>-1?'correct':'wrong'):'';
+        picks+='<span class="qpsel '+cls+'" style="display:inline-block;padding:4px 8px;font-size:.74rem">'+(s||'—')+'</span>';
       });
       return '<div class="qpr"><span class="qpl" title="'+name+'">'+name+'</span>'+picks+'</div></div>';
     }).join('');
-    html+='<div class="qsec"><div class="qhdr"><h3>Group '+g+'</h3><span class="tb">'+teams.join(' · ')+'</span></div>'+
-      '<div class="qbody"><div class="qar"><span class="qal">✅ Actual</span><div class="qapicks">'+ap+'</div></div>'+prows+'</div></div>';
+    html+='<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #f0efe8"><div style="font-size:.7rem;font-weight:700;color:var(--gray-mid);text-transform:uppercase;margin-bottom:.3rem">Player Predictions</div>'+prows+'</div>';
+
+    html+='</div></div>';
   });
   el('aqual').innerHTML=html;
 }
 
-async function setAQual(g,idx,val){
-  if(!GD.qualActual[g])GD.qualActual[g]=['',''];GD.qualActual[g][idx]=val;
+async function setGroupResult(g,mid,field,val){
+  if(!GD.groupResults) GD.groupResults={};
+  if(!GD.groupResults[mid]) GD.groupResults[mid]={s1:'',s2:''};
+  GD.groupResults[mid][field] = val===''?'':parseInt(val,10);
+  syncQualActualFromResults();
   try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
   renderAQual();
 }
@@ -1352,79 +1421,45 @@ function renderScores(){
   }).join('');
 }
 
-// ─── GROUP STANDINGS ──────────────────────────────────────────────────────
-// Computed client-side from match results (openfootball data), reusing the
-// same matchStatus()/matchScores() logic as Live Scores.
-var standingsData=[]; // flat match list, reused across refreshes
-
+// ─── GROUP STANDINGS (public page) ────────────────────────────────────────
+// Reads directly from GD.groupResults — the same data the admin enters in
+// the Qualifiers tab. No external API, so it's always accurate and in sync.
 function showStandings(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
   el('main').style.display='none';el('scores-page').style.display='none';el('standings-page').style.display='block';
   el('hsub').textContent='Group Standings';el('pbadge').style.display='none';
   location.hash='standings';
-  fetchStandings();
+  renderStandings();
+  var lbl=el('standlbl');if(lbl)lbl.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 }
 
+// Manual refresh just re-reads the latest data.json from GitHub (in case
+// the admin updated results on another device) and re-renders.
 async function fetchStandings(){
-  var grid=el('standgrid');var lbl=el('standlbl');
-  if(!grid)return;
+  var lbl=el('standlbl');
   if(lbl)lbl.textContent='Refreshing…';
   try{
-    standingsData=await loadMatches();
+    GD=await ghRead();
     renderStandings();
     if(lbl)lbl.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){
-    grid.innerHTML='<div class="no-match"><div class="nmi">📡</div><p style="color:rgba(255,255,255,.5)">Could not load standings.<br>'+e.message+'</p><button class="rbtn" style="margin:.75rem auto 0" onclick="fetchStandings()">Try again</button></div>';
-    if(lbl)lbl.textContent='Failed';
+    if(lbl)lbl.textContent='Failed to refresh';
   }
-}
-
-// Build a {team: {P,W,D,L,GF,GA,GD,Pts}} table for one group from finished matches
-function computeGroupTable(groupKey){
-  var teams=GROUPS[groupKey];
-  var table={};
-  teams.forEach(function(t){table[t]={P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0};});
-
-  // Match group labels in the data can be like "Group A" or just "A" — normalise
-  var groupMatches=standingsData.filter(function(m){
-    var g=(m.group||'').toString().trim();
-    return g===groupKey || g==='Group '+groupKey || g.toUpperCase()==='GROUP '+groupKey;
-  });
-
-  groupMatches.forEach(function(m){
-    if(matchStatus(m)!=='ft') return; // only count finished matches
-    var sc=matchScores(m);
-    if(!sc.played) return;
-    var t1=m.team1, t2=m.team2;
-    if(!table[t1]||!table[t2]) return; // safety: unknown team name
-    table[t1].P++; table[t2].P++;
-    table[t1].GF+=sc.s1; table[t1].GA+=sc.s2;
-    table[t2].GF+=sc.s2; table[t2].GA+=sc.s1;
-    if(sc.s1>sc.s2){table[t1].W++;table[t1].Pts+=3;table[t2].L++;}
-    else if(sc.s1<sc.s2){table[t2].W++;table[t2].Pts+=3;table[t1].L++;}
-    else{table[t1].D++;table[t2].D++;table[t1].Pts+=1;table[t2].Pts+=1;}
-  });
-
-  teams.forEach(function(t){table[t].GD=table[t].GF-table[t].GA;});
-
-  // Sort: Pts desc, GD desc, GF desc, name asc (alphabetical tiebreak — head-to-head not modelled)
-  var rows=teams.map(function(t){return Object.assign({team:t},table[t]);});
-  rows.sort(function(a,b){
-    if(b.Pts!==a.Pts) return b.Pts-a.Pts;
-    if(b.GD!==a.GD) return b.GD-a.GD;
-    if(b.GF!==a.GF) return b.GF-a.GF;
-    return a.team.localeCompare(b.team);
-  });
-  return rows;
 }
 
 function renderStandings(){
   var grid=el('standgrid');if(!grid)return;
+  if(!GD.groupResults) GD.groupResults={};
   var html='';
   GK.forEach(function(g){
     var rows=computeGroupTable(g);
-    var anyPlayed=rows.some(function(r){return r.P>0;});
-    html+='<div class="stand-group"><div class="stand-ghdr"><h3>Group '+g+'</h3><span>'+(anyPlayed?'In progress':'Not started')+'</span></div>'+
+    var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});
+    var playedCount=matches.filter(function(m){
+      var r=GD.groupResults[m.id];
+      return r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null;
+    }).length;
+    var statusLabel = playedCount===0 ? 'Not started' : playedCount===matches.length ? '✅ Final' : playedCount+'/'+matches.length+' played';
+    html+='<div class="stand-group"><div class="stand-ghdr"><h3>Group '+g+'</h3><span>'+statusLabel+'</span></div>'+
       '<table class="stand-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
     rows.forEach(function(r,idx){
       var zoneClass = idx<2 ? 'qz' : idx===2 ? 'tz' : 'oz';

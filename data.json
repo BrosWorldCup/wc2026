@@ -13,7 +13,12 @@
     "Mohamad"
   ],
   "unlocked": false,
-  "qualActual": {},
+  "qualActual": {
+    "A": [
+      "Mexico",
+      ""
+    ]
+  },
   "thirdsActual": [],
   "koResults": {},
   "twActual": "",

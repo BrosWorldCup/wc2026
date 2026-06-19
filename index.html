@@ -301,6 +301,7 @@ tbody td:nth-child(2){text-align:left;}
 <nav id="anav" style="display:none">
   <button class="active" onclick="showTab('asetup',this)">⚙️ Setup</button>
   <button onclick="showTab('alb',this)">🏆 Leaderboard</button>
+  <button onclick="showTab('agroups',this)">⚽ Group Results</button>
   <button onclick="showTab('aqual',this)">🎯 Qualifiers</button>
   <button onclick="showTab('athirds',this)">3️⃣ Best 3rds</button>
   <button onclick="showTab('ako',this)">🥊 Knockouts</button>
@@ -345,7 +346,7 @@ tbody td:nth-child(2){text-align:left;}
 <div id="sticky"><button onclick="goSubmit()">📤 Submit Predictions</button></div>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
-const GH_OWNER = 'BrosWorldCup';
+const GH_OWNER = 'mohamadndine';
 const GH_REPO  = 'wc2026';
 const DATA_FILE = 'data.json';
 const ADMIN_PASSWORD = 'WorldCup26';
@@ -383,8 +384,21 @@ KO_DEF.forEach(function(d){
   for(var i=1;i<=d.n;i++) KO_MATCHES.push({id:'ko_'+d.k.replace(/\s/g,'_')+'_'+i,round:d.k,label:'Match '+i,cls:d.cls,tab:d.tab});
 });
 
+// Group stage fixtures: full round-robin within each group (6 matches × 12 groups = 72... 
+// actually standard WC26 format is 3 matchdays × 2 matches/group = 6 matches per group,
+// which IS the full round robin for 4 teams (C(4,2)=6). Generate deterministically.
+const GROUP_MATCHES = [];
+GK.forEach(function(g){
+  var teams = GROUPS[g];
+  for(var i=0;i<teams.length;i++){
+    for(var j=i+1;j<teams.length;j++){
+      GROUP_MATCHES.push({id:'gm_'+g+'_'+i+'_'+j, group:g, team1:teams[i], team2:teams[j]});
+    }
+  }
+});
+
 // ─── STATE ────────────────────────────────────────────────────────────────
-var GD = {players:[],unlocked:false,qualActual:{},thirdsActual:[],koResults:{},twActual:'',predictions:{}};
+var GD = {players:[],unlocked:false,qualActual:{},thirdsActual:[],koResults:{},twActual:'',predictions:{},groupResults:{}};
 var ghToken = '';
 var ghSha = '';
 var currentPlayer = null;
@@ -906,7 +920,7 @@ function doAdminLogin(){
     location.hash='admin';
     el('hsub').textContent='Admin Panel';el('pbadge').style.display='none';
     el('anav').style.display='flex';el('pnav').style.display='none';
-    showMain('<div id="asetup" class="panel active"></div><div id="alb" class="panel"></div><div id="aqual" class="panel"></div><div id="athirds" class="panel"></div><div id="ako" class="panel"></div><div id="atw" class="panel"></div>');
+    showMain('<div id="asetup" class="panel active"></div><div id="alb" class="panel"></div><div id="agroups" class="panel"></div><div id="aqual" class="panel"></div><div id="athirds" class="panel"></div><div id="ako" class="panel"></div><div id="atw" class="panel"></div>');
     showTab('asetup',document.querySelector('#anav button'));
   } else {el('lerr').textContent='❌ Incorrect password';}
 }
@@ -920,6 +934,7 @@ function showTab(tab,btn){
   var e=el(tab);if(!e)return;e.classList.add('active');if(btn)btn.classList.add('active');
   if(tab==='asetup')renderASetup();
   if(tab==='alb')renderALB();
+  if(tab==='agroups')renderAGroups();
   if(tab==='aqual')renderAQual();
   if(tab==='athirds')renderAThirds();
   if(tab==='ako')renderAKO();
@@ -988,6 +1003,48 @@ function renderALB(){
     html+='<tr><td><span class="rank-badge '+cls+'">'+medal+'</span></td><td class="pname">'+p.name+(hasPreds(p.name)?'<span style="font-size:.6rem;color:var(--green);margin-left:3px">✓</span>':'')+'</td><td>'+p.qual+'</td><td>'+p.thirds+'</td><td>'+p.ko+'</td><td>'+p.tw+'</td><td class="tpts">'+p.total+'</td></tr>';
   });
   el('alb').innerHTML=html+'</tbody></table></div>';
+}
+
+// ─── ADMIN: GROUP RESULTS ─────────────────────────────────────────────────
+// Admin enters actual match scores here. This is the single source of truth
+// for the public Standings page — no external API needed, so it's always
+// accurate and matches your own data.
+function renderAGroups(){
+  if(!GD.groupResults) GD.groupResults={};
+  var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem">'+
+    '<h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">⚽ Group Stage Results</h2>'+
+    '<span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">Enter scores as matches finish</span></div>'+
+    '<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6)">Enter the final score for each match below. The Standings page recalculates points, GD, and qualification automatically — no need to touch anything else.</div>';
+
+  GK.forEach(function(g){
+    var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});
+    html+='<div class="qsec"><div class="qhdr"><h3>Group '+g+'</h3><span class="tb">'+GROUPS[g].join(' · ')+'</span></div><div class="qbody">';
+    matches.forEach(function(m){
+      var res=GD.groupResults[m.id]||{s1:'',s2:''};
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0efe8;flex-wrap:wrap">'+
+        '<span style="flex:1;min-width:140px;font-size:.8rem;font-weight:600">'+m.team1+' <span style="color:var(--gray-mid);font-weight:400">vs</span> '+m.team2+'</span>'+
+        '<input type="number" min="0" max="20" placeholder="-" value="'+res.s1+'" style="width:46px;padding:5px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.85rem" onchange="setGroupResult(\''+m.id+'\',\'s1\',this.value)">'+
+        '<span style="color:var(--gray-mid)">–</span>'+
+        '<input type="number" min="0" max="20" placeholder="-" value="'+res.s2+'" style="width:46px;padding:5px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.85rem" onchange="setGroupResult(\''+m.id+'\',\'s2\',this.value)">'+
+        '<button class="cbtn" style="background:var(--red)" onclick="clearGroupResult(\''+m.id+'\')" title="Clear result">✕</button>'+
+        '</div>';
+    });
+    html+='</div></div>';
+  });
+  el('agroups').innerHTML=html;
+}
+
+async function setGroupResult(mid,field,val){
+  if(!GD.groupResults) GD.groupResults={};
+  if(!GD.groupResults[mid]) GD.groupResults[mid]={s1:'',s2:''};
+  GD.groupResults[mid][field] = val===''?'':parseInt(val,10);
+  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+}
+
+async function clearGroupResult(mid){
+  if(GD.groupResults) delete GD.groupResults[mid];
+  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+  renderAGroups();
 }
 
 // ─── ADMIN: QUALIFIERS ────────────────────────────────────────────────────

@@ -37,8 +37,8 @@ main{max-width:960px;margin:0 auto;padding:1.25rem .9rem 5rem;}
 .back-btn:active{background:rgba(255,255,255,.18);}
 /* WELCOME */
 .welcome-wrap{min-height:calc(100vh - 120px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1rem;}
-.welcome-cards{display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;max-width:520px;}
-@media(max-width:480px){.welcome-cards{grid-template-columns:1fr;}}
+.welcome-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;width:100%;max-width:720px;}
+@media(max-width:650px){.welcome-cards{grid-template-columns:1fr;max-width:420px;}}
 .wbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:1.75rem 1rem;border-radius:16px;border:none;cursor:pointer;font-family:'Inter',sans-serif;transition:transform .15s;-webkit-tap-highlight-color:transparent;}
 .wbtn:active{transform:scale(.97);}
 .wbtn .wi{font-size:2.8rem;line-height:1;}
@@ -46,6 +46,7 @@ main{max-width:960px;margin:0 auto;padding:1.25rem .9rem 5rem;}
 .wbtn .wd{font-size:.75rem;opacity:.8;line-height:1.4;text-align:center;}
 .wbtn.predictions{background:linear-gradient(135deg,#1a6b3c,#2e8b57);color:#fff;box-shadow:0 6px 24px rgba(26,107,60,.4);}
 .wbtn.scores{background:linear-gradient(135deg,#c9a84c,#e6bf6a);color:#3a2600;box-shadow:0 6px 24px rgba(201,168,76,.35);}
+.wbtn.standings{background:linear-gradient(135deg,#1a3a6b,#2563eb);color:#fff;box-shadow:0 6px 24px rgba(37,99,235,.35);}
 /* HOME */
 .home-card{max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:1.75rem;box-shadow:var(--shadow);}
 .home-card h2{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--green);letter-spacing:1px;margin-bottom:.25rem;}
@@ -210,7 +211,26 @@ tbody td:nth-child(2){text-align:left;}
 /* STICKY */
 #sticky{display:none;position:fixed;bottom:1rem;right:1rem;z-index:999;}
 #sticky button{background:var(--gold);color:#3a2600;border:none;border-radius:50px;padding:.65rem 1.2rem;font-family:'Inter',sans-serif;font-weight:700;font-size:.83rem;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);display:flex;align-items:center;gap:5px;}
-/* SCORES */
+/* STANDINGS */
+#standings-page{display:none;max-width:960px;margin:0 auto;padding:1.25rem .9rem 5rem;}
+.stand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;}
+.stand-group{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
+.stand-ghdr{background:#1a3a6b;padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;}
+.stand-ghdr h3{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:#fff;letter-spacing:1px;}
+.stand-ghdr span{font-size:.65rem;color:rgba(255,255,255,.6);}
+.stand-table{width:100%;border-collapse:collapse;}
+.stand-table thead th{background:#f1f4fa;color:#2c2c2a;font-size:.62rem;font-weight:700;padding:6px 4px;text-align:center;text-transform:uppercase;}
+.stand-table thead th:first-child{text-align:left;padding-left:.8rem;width:36%;}
+.stand-table tbody td{padding:6px 4px;font-size:.74rem;text-align:center;border-top:1px solid #f0efe8;}
+.stand-table tbody td:first-child{text-align:left;padding-left:.8rem;font-weight:600;}
+.stand-table tbody tr.qz td:first-child{border-left:3px solid var(--green);}
+.stand-table tbody tr.tz td:first-child{border-left:3px solid var(--gold);}
+.stand-table tbody tr.oz td:first-child{border-left:3px solid transparent;}
+.stand-pts{font-weight:700;color:var(--green);}
+.stand-legend{display:flex;gap:14px;flex-wrap:wrap;padding:.6rem 1rem;font-size:.68rem;color:var(--gray-mid);border-top:1px solid #f0efe8;}
+.stand-legend span{display:inline-flex;align-items:center;gap:4px;}
+.stand-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+.stand-note{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6);}
 #scores-page{display:none;max-width:960px;margin:0 auto;padding:1.25rem .9rem 5rem;}
 .stbar{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap;}
 .stbar h2{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:#fff;letter-spacing:1px;flex:1;}
@@ -311,6 +331,16 @@ tbody td:nth-child(2){text-align:left;}
     <button class="sfbtn" onclick="setFilter('upcoming',this)">Upcoming</button>
   </div>
   <div class="sgrid" id="sgrid"><div class="loading"><div class="spinner"></div><p>Loading scores…</p></div></div>
+</div>
+<div id="standings-page">
+  <button class="back-btn" onclick="showWelcome()">← Back to Home</button>
+  <div class="stbar">
+    <h2>📊 Group Standings</h2>
+    <button class="rbtn" onclick="fetchStandings()">🔄 Refresh</button>
+    <span class="rlbl" id="standlbl"></span>
+  </div>
+  <div class="stand-note">Standings are calculated automatically from match results (group stage matches only). Top 2 in each group qualify directly; the best 8 third-place teams also advance.</div>
+  <div class="stand-grid" id="standgrid"><div class="loading"><div class="spinner"></div><p>Loading standings…</p></div></div>
 </div>
 <div id="sticky"><button onclick="goSubmit()">📤 Submit Predictions</button></div>
 <script>
@@ -463,6 +493,7 @@ async function init(){
   var h=location.hash;
   if(h==='#admin') showAdminLogin();
   else if(h==='#scores') showScores();
+  else if(h==='#standings') showStandings();
   else showWelcome();
 }
 
@@ -471,7 +502,7 @@ function showWelcome(){
   el('anav').style.display='none';
   el('pnav').style.display='none';
   el('sticky').style.display='none';
-  el('scores-page').style.display='none';
+  el('scores-page').style.display='none';el('standings-page').style.display='none';
   el('main').style.display='block';
   el('hsub').textContent='Prediction Game';
   el('pbadge').style.display='none';
@@ -484,6 +515,7 @@ function showWelcome(){
     '<div style="color:rgba(255,255,255,.55);font-size:.9rem;text-align:center;margin-bottom:2.5rem">What would you like to do?</div>'+
     '<div class="welcome-cards">'+
     '<button class="wbtn predictions" onclick="showHome()"><div class="wi">🎯</div><div class="wt">Predictions</div><div class="wd">Enter your picks &amp; check the leaderboard</div></button>'+
+    '<button class="wbtn standings" onclick="showStandings()"><div class="wi">📊</div><div class="wt">Standings</div><div class="wd">Group tables, points, goal difference</div></button>'+
     '<button class="wbtn scores" onclick="showScores()"><div class="wi">📺</div><div class="wt">Live Scores</div><div class="wd">Follow all World Cup matches in real time</div></button>'+
     '</div>'+
     '<div style="margin-top:1.5rem"><button onclick="location.hash=\'admin\';showAdminLogin()" style="background:none;border:none;color:rgba(255,255,255,.3);font-size:.72rem;cursor:pointer;font-family:Inter,sans-serif;text-decoration:underline">Admin access</button></div>'+
@@ -493,7 +525,7 @@ function showWelcome(){
 // ─── HOME ─────────────────────────────────────────────────────────────────
 function showHome(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('scores-page').style.display='none';el('main').style.display='block';
+  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';
   el('hsub').textContent='Prediction Game';el('pbadge').style.display='none';
   isAdmin=false;stopRefresh();
   var locked=isLocked();
@@ -744,7 +776,7 @@ async function doSubmit(){
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────
 function showLB(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('scores-page').style.display='none';el('main').style.display='block';stopRefresh();
+  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';stopRefresh();
   var rows=GD.players.map(function(p){var n=pName(p);return Object.assign({name:n},score(n));}).sort(function(a,b){return b.total-a.total;});
   var html='<button class="back-btn" onclick="showHome()">← Back</button>'+
     '<div class="lb-hdr"><h2>🏆 Leaderboard</h2><p>Live standings</p>'+
@@ -763,7 +795,7 @@ function showLB(){
 // ─── PREDICTIONS SUMMARY ──────────────────────────────────────────────────
 function showSummary(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('scores-page').style.display='none';el('main').style.display='block';stopRefresh();
+  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';stopRefresh();
 
   var players=GD.players.map(pName);
 
@@ -857,7 +889,7 @@ function showSummary(){
 // ─── ADMIN LOGIN ──────────────────────────────────────────────────────────
 function showAdminLogin(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('scores-page').style.display='none';el('main').style.display='block';stopRefresh();
+  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';stopRefresh();
   showMain('<div class="login-card"><h2>🔐 Admin Access</h2><p>Enter the admin password.</p>'+
     '<input type="password" id="apw" placeholder="Password" onkeydown="if(event.key===\'Enter\')doAdminLogin()">'+
     '<button class="btn btn-red btn-full" onclick="doAdminLogin()">Login</button>'+
@@ -1138,7 +1170,7 @@ function matchScores(m){
 
 function showScores(){
   el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('main').style.display='none';el('scores-page').style.display='block';
+  el('main').style.display='none';el('standings-page').style.display='none';el('scores-page').style.display='block';
   el('hsub').textContent='Live Scores';el('pbadge').style.display='none';
   location.hash='scores';
   fetchScores();stopRefresh();
@@ -1150,42 +1182,47 @@ function stopRefresh(){
   var lbl=el('rlbl');if(lbl)lbl.textContent='';
 }
 
+// Shared loader: fetch + parse the openfootball JSON into a flat match array.
+// Used by both Live Scores and Standings so we don't fetch twice.
+async function loadMatches(){
+  var r=await fetch(OF_URL+'?t='+Date.now());
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  var json=await r.json();
+  var all=[];
+  if(Array.isArray(json.rounds)){
+    json.rounds.forEach(function(round){
+      (round.matches||[]).forEach(function(m){
+        var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
+        var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
+        var tz=m.timezone||'UTC+0';
+        var timeStr=m.time?(m.time+' '+tz):null;
+        all.push({date:m.date,time:timeStr,group:m.group||round.name||'',ground:m.stadium?m.stadium.name:m.city||'',
+          team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
+          score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
+          goals1:m.goals1||[],goals2:m.goals2||[]});
+      });
+    });
+  } else if(Array.isArray(json.matches)){
+    json.matches.forEach(function(m){
+      var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
+      var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
+      var tz=m.timezone||'UTC+0';
+      var timeStr=m.time?(m.time+' '+tz):null;
+      all.push({date:m.date,time:timeStr,group:m.group||m.round||'',ground:m.stadium?m.stadium.name:m.city||'',
+        team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
+        score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
+        goals1:m.goals1||[],goals2:m.goals2||[]});
+    });
+  }
+  return all;
+}
+
 async function fetchScores(){
   var grid=el('sgrid');var lbl=el('rlbl');
   if(!grid)return;
   if(lbl)lbl.textContent='Refreshing…';
   try{
-    var r=await fetch(OF_URL+'?t='+Date.now());
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    var json=await r.json();
-    var all=[];
-    // Handle both { rounds:[{name,matches:[]}] } and { matches:[] }
-    if(Array.isArray(json.rounds)){
-      json.rounds.forEach(function(round){
-        (round.matches||[]).forEach(function(m){
-          var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
-          var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
-          var tz=m.timezone||'UTC+0';
-          var timeStr=m.time?(m.time+' '+tz):null;
-          all.push({date:m.date,time:timeStr,group:m.group||round.name||'',ground:m.stadium?m.stadium.name:m.city||'',
-            team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
-            score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
-            goals1:m.goals1||[],goals2:m.goals2||[]});
-        });
-      });
-    } else if(Array.isArray(json.matches)){
-      json.matches.forEach(function(m){
-        var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
-        var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
-        var tz=m.timezone||'UTC+0';
-        var timeStr=m.time?(m.time+' '+tz):null;
-        all.push({date:m.date,time:timeStr,group:m.group||m.round||'',ground:m.stadium?m.stadium.name:m.city||'',
-          team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
-          score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
-          goals1:m.goals1||[],goals2:m.goals2||[]});
-      });
-    }
-    scoresData=all;
+    scoresData=await loadMatches();
     renderScores();
     if(lbl)lbl.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){
@@ -1256,6 +1293,91 @@ function renderScores(){
       '<div class="sfoot"><span class="svenue">'+ground+'</span></div>'+
     '</div>';
   }).join('');
+}
+
+// ─── GROUP STANDINGS ──────────────────────────────────────────────────────
+// Computed client-side from match results (openfootball data), reusing the
+// same matchStatus()/matchScores() logic as Live Scores.
+var standingsData=[]; // flat match list, reused across refreshes
+
+function showStandings(){
+  el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
+  el('main').style.display='none';el('scores-page').style.display='none';el('standings-page').style.display='block';
+  el('hsub').textContent='Group Standings';el('pbadge').style.display='none';
+  location.hash='standings';
+  fetchStandings();
+}
+
+async function fetchStandings(){
+  var grid=el('standgrid');var lbl=el('standlbl');
+  if(!grid)return;
+  if(lbl)lbl.textContent='Refreshing…';
+  try{
+    standingsData=await loadMatches();
+    renderStandings();
+    if(lbl)lbl.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    grid.innerHTML='<div class="no-match"><div class="nmi">📡</div><p style="color:rgba(255,255,255,.5)">Could not load standings.<br>'+e.message+'</p><button class="rbtn" style="margin:.75rem auto 0" onclick="fetchStandings()">Try again</button></div>';
+    if(lbl)lbl.textContent='Failed';
+  }
+}
+
+// Build a {team: {P,W,D,L,GF,GA,GD,Pts}} table for one group from finished matches
+function computeGroupTable(groupKey){
+  var teams=GROUPS[groupKey];
+  var table={};
+  teams.forEach(function(t){table[t]={P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0};});
+
+  // Match group labels in the data can be like "Group A" or just "A" — normalise
+  var groupMatches=standingsData.filter(function(m){
+    var g=(m.group||'').toString().trim();
+    return g===groupKey || g==='Group '+groupKey || g.toUpperCase()==='GROUP '+groupKey;
+  });
+
+  groupMatches.forEach(function(m){
+    if(matchStatus(m)!=='ft') return; // only count finished matches
+    var sc=matchScores(m);
+    if(!sc.played) return;
+    var t1=m.team1, t2=m.team2;
+    if(!table[t1]||!table[t2]) return; // safety: unknown team name
+    table[t1].P++; table[t2].P++;
+    table[t1].GF+=sc.s1; table[t1].GA+=sc.s2;
+    table[t2].GF+=sc.s2; table[t2].GA+=sc.s1;
+    if(sc.s1>sc.s2){table[t1].W++;table[t1].Pts+=3;table[t2].L++;}
+    else if(sc.s1<sc.s2){table[t2].W++;table[t2].Pts+=3;table[t1].L++;}
+    else{table[t1].D++;table[t2].D++;table[t1].Pts+=1;table[t2].Pts+=1;}
+  });
+
+  teams.forEach(function(t){table[t].GD=table[t].GF-table[t].GA;});
+
+  // Sort: Pts desc, GD desc, GF desc, name asc (alphabetical tiebreak — head-to-head not modelled)
+  var rows=teams.map(function(t){return Object.assign({team:t},table[t]);});
+  rows.sort(function(a,b){
+    if(b.Pts!==a.Pts) return b.Pts-a.Pts;
+    if(b.GD!==a.GD) return b.GD-a.GD;
+    if(b.GF!==a.GF) return b.GF-a.GF;
+    return a.team.localeCompare(b.team);
+  });
+  return rows;
+}
+
+function renderStandings(){
+  var grid=el('standgrid');if(!grid)return;
+  var html='';
+  GK.forEach(function(g){
+    var rows=computeGroupTable(g);
+    var anyPlayed=rows.some(function(r){return r.P>0;});
+    html+='<div class="stand-group"><div class="stand-ghdr"><h3>Group '+g+'</h3><span>'+(anyPlayed?'In progress':'Not started')+'</span></div>'+
+      '<table class="stand-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    rows.forEach(function(r,idx){
+      var zoneClass = idx<2 ? 'qz' : idx===2 ? 'tz' : 'oz';
+      html+='<tr class="'+zoneClass+'"><td>'+r.team+'</td><td>'+r.P+'</td><td>'+r.W+'</td><td>'+r.D+'</td><td>'+r.L+'</td><td>'+r.GF+'</td><td>'+r.GA+'</td><td>'+(r.GD>0?'+':'')+r.GD+'</td><td class="stand-pts">'+r.Pts+'</td></tr>';
+    });
+    html+='</tbody></table>'+
+      '<div class="stand-legend"><span><i style="background:var(--green)"></i>Qualifies (Top 2)</span><span><i style="background:var(--gold)"></i>Best 3rd contender</span></div>'+
+      '</div>';
+  });
+  grid.innerHTML=html;
 }
 
 // ─── START ────────────────────────────────────────────────────────────────

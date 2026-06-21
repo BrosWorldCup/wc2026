@@ -1110,12 +1110,10 @@ function computeGroupTable(groupKey){
   return rows;
 }
 
-// Auto-sync GD.qualActual (top 2 per group) from computed standings.
-// Called after every result entry so player scoring stays in sync automatically.
-// Only marks a team qualified once the group is fully complete (all 6 matches
-// played) OR the team is mathematically guaranteed top-2 — for simplicity and
-// transparency we use "all 6 matches played" as the trigger, with a manual
-// override available if needed.
+// Sync GD.qualActual (top 2 per group) from computed standings.
+// Bidirectional: locks in the top 2 once a group's 6 matches are all
+// played, AND clears it back out if a group is edited back to incomplete
+// (e.g. a score is cleared), so the qualified badge never shows stale data.
 function syncQualActualFromResults(){
   GK.forEach(function(g){
     var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});
@@ -1124,19 +1122,29 @@ function syncQualActualFromResults(){
       return r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null && !isNaN(parseInt(r.s1,10)) && !isNaN(parseInt(r.s2,10));
     }).length;
     if(playedCount===matches.length){
-      // Group complete — lock in top 2 automatically
+      // Group complete — (re)compute top 2 fresh every time, in case an
+      // earlier score in an already-complete group was edited afterward.
       var rows=computeGroupTable(g);
       GD.qualActual[g]=[rows[0].team, rows[1].team];
+    } else {
+      // Group no longer fully played (e.g. a score was cleared) — remove
+      // any previously locked-in qualification so it doesn't show stale
+      // teams as qualified.
+      if(GD.qualActual[g]) delete GD.qualActual[g];
     }
-    // If not complete, leave qualActual untouched (admin can still see live
-    // standings, but points aren't awarded until the group is finalised —
-    // this avoids awarding points based on a table that could still change).
   });
 }
 
 // ─── ADMIN: QUALIFIERS (results entry + live standings + auto-qualify) ────
 function renderAQual(){
   if(!GD.groupResults) GD.groupResults={};
+  if(!GD.qualActual) GD.qualActual={};
+  // Always recompute qualification fresh from current scores before
+  // rendering — never trust a previously-cached GD.qualActual value, since
+  // it could be stale from an earlier session, an older app version, or a
+  // race during rapid edits. This guarantees the qualified teams shown
+  // always match what the standings table says right now.
+  syncQualActualFromResults();
   var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem">'+
     '<h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🎯 Group Stage &amp; Qualifiers</h2>'+
     '<span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">3 pts per correct qualifier pick</span></div>'+
@@ -1232,6 +1240,40 @@ async function setGroupResult(g,mid,field,val){
     await safeWrite(function(d){
       if(!d.groupResults[mid]) d.groupResults[mid]={s1:'',s2:''};
       d.groupResults[mid][field] = val===''?'':parseInt(val,10);
+      // Recompute qualification on the exact object being saved, so the
+      // version written to GitHub is never stale even if this write landed
+      // out of order relative to another in-flight edit.
+      GK.forEach(function(grp){
+        var gMatches=GROUP_MATCHES.filter(function(mm){return mm.group===grp;});
+        var played=gMatches.filter(function(mm){
+          var r=d.groupResults[mm.id];
+          return r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null && !isNaN(parseInt(r.s1,10)) && !isNaN(parseInt(r.s2,10));
+        }).length;
+        if(played===gMatches.length){
+          var table={};
+          GROUPS[grp].forEach(function(t){table[t]={P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0};});
+          gMatches.forEach(function(mm){
+            var r=d.groupResults[mm.id];
+            var s1=parseInt(r.s1,10),s2=parseInt(r.s2,10);
+            table[mm.team1].P++;table[mm.team2].P++;
+            table[mm.team1].GF+=s1;table[mm.team1].GA+=s2;
+            table[mm.team2].GF+=s2;table[mm.team2].GA+=s1;
+            if(s1>s2){table[mm.team1].W++;table[mm.team1].Pts+=3;table[mm.team2].L++;}
+            else if(s1<s2){table[mm.team2].W++;table[mm.team2].Pts+=3;table[mm.team1].L++;}
+            else{table[mm.team1].D++;table[mm.team2].D++;table[mm.team1].Pts+=1;table[mm.team2].Pts+=1;}
+          });
+          var rows=GROUPS[grp].map(function(t){return Object.assign({team:t},table[t],{GD:table[t].GF-table[t].GA});});
+          rows.sort(function(a,b){
+            if(b.Pts!==a.Pts)return b.Pts-a.Pts;
+            if(b.GD!==a.GD)return b.GD-a.GD;
+            if(b.GF!==a.GF)return b.GF-a.GF;
+            return a.team.localeCompare(b.team);
+          });
+          d.qualActual[grp]=[rows[0].team,rows[1].team];
+        } else if(d.qualActual[grp]){
+          delete d.qualActual[grp];
+        }
+      });
     });
     if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
   }catch(e){

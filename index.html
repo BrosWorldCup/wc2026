@@ -1074,6 +1074,7 @@ function renderAQual(){
   var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem">'+
     '<h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🎯 Group Stage &amp; Qualifiers</h2>'+
     '<span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">3 pts per correct qualifier pick</span></div>'+
+    '<div id="aqsavestatus" style="display:none;font-size:.82rem;font-weight:600;padding:.6rem 1rem;border-radius:8px;margin-bottom:.9rem;background:#fff;"></div>'+
     '<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6)">'+
     'Enter match scores as games finish. Standings, qualification, and player points are calculated automatically once all 6 matches in a group are complete — no manual qualifier selection needed.</div>';
 
@@ -1088,14 +1089,20 @@ function renderAQual(){
     var complete=playedCount===matches.length;
     var qualified=GD.qualActual[g]||[];
 
-    // Match score inputs
+    // Match score dropdowns (selects fire onchange reliably on every device,
+    // unlike number inputs which can silently miss the event on mobile)
+    var scoreOpts=function(sel){
+      var o='<option value="">-</option>';
+      for(var i=0;i<=15;i++){o+='<option value="'+i+'"'+(String(sel)===String(i)?' selected':'')+'>'+i+'</option>';}
+      return o;
+    };
     var matchRows=matches.map(function(m){
       var res=GD.groupResults[m.id]||{s1:'',s2:''};
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0efe8;flex-wrap:wrap">'+
         '<span style="flex:1;min-width:130px;font-size:.78rem;font-weight:600">'+m.team1+' <span style="color:var(--gray-mid);font-weight:400">vs</span> '+m.team2+'</span>'+
-        '<input type="number" min="0" max="20" placeholder="-" value="'+(res.s1===''||res.s1==null?'':res.s1)+'" style="width:42px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s1\',this.value)">'+
+        '<select style="width:52px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s1\',this.value)">'+scoreOpts(res.s1)+'</select>'+
         '<span style="color:var(--gray-mid)">–</span>'+
-        '<input type="number" min="0" max="20" placeholder="-" value="'+(res.s2===''||res.s2==null?'':res.s2)+'" style="width:42px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s2\',this.value)">'+
+        '<select style="width:52px;padding:4px;border:1px solid #d0d0cc;border-radius:6px;text-align:center;font-size:.8rem" onchange="setGroupResult(\''+g+'\',\''+m.id+'\',\'s2\',this.value)">'+scoreOpts(res.s2)+'</select>'+
         '</div>';
     }).join('');
 
@@ -1146,7 +1153,23 @@ async function setGroupResult(g,mid,field,val){
   if(!GD.groupResults[mid]) GD.groupResults[mid]={s1:'',s2:''};
   GD.groupResults[mid][field] = val===''?'':parseInt(val,10);
   syncQualActualFromResults();
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+  var st=el('aqsavestatus');
+  if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';st.style.display='block';}
+  try{
+    // Re-read first to avoid overwriting newer changes with a stale sha,
+    // then re-apply this specific edit on top of the freshest data.
+    var fresh = await ghRead();
+    if(!fresh.groupResults) fresh.groupResults={};
+    if(!fresh.qualActual) fresh.qualActual={};
+    fresh.groupResults[mid] = GD.groupResults[mid];
+    GD = fresh;
+    syncQualActualFromResults();
+    await ghWrite(GD);
+    if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
+  }catch(e){
+    if(st){st.style.color='var(--red)';st.textContent='❌ Save failed: '+e.message+' — your change was NOT saved. Check your token in the prompt or re-login as admin.';st.style.display='block';}
+    else alert('Save failed: '+e.message);
+  }
   renderAQual();
 }
 
@@ -1450,7 +1473,15 @@ async function fetchStandings(){
 function renderStandings(){
   var grid=el('standgrid');if(!grid)return;
   if(!GD.groupResults) GD.groupResults={};
+  var totalEntered=0;
+  GROUP_MATCHES.forEach(function(m){
+    var r=GD.groupResults[m.id];
+    if(r && r.s1!==''&&r.s1!=null && r.s2!==''&&r.s2!=null) totalEntered++;
+  });
   var html='';
+  if(totalEntered===0){
+    html+='<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:10px;padding:.85rem 1rem;margin-bottom:1.1rem;font-size:.82rem;color:#856404"><strong>⚠️ No match results entered yet.</strong> Standings will show 0 points for every team until the admin enters scores in the Qualifiers tab. If you already entered scores and still see this, the save likely did not reach GitHub — go to Admin → Qualifiers and re-enter the score for one match to confirm it saves (look for the green "✅ Saved to GitHub" confirmation).</div>';
+  }
   GK.forEach(function(g){
     var rows=computeGroupTable(g);
     var matches=GROUP_MATCHES.filter(function(m){return m.group===g;});

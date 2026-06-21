@@ -1178,18 +1178,31 @@ async function setGroupResult(g,mid,field,val){
   var st=el('aqsavestatus');
   if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';st.style.display='block';}
   try{
-    // Re-read first to avoid overwriting newer changes with a stale sha,
-    // then re-apply this specific edit on top of the freshest data.
-    var fresh = await ghRead();
-    if(!fresh.groupResults) fresh.groupResults={};
-    if(!fresh.qualActual) fresh.qualActual={};
-    fresh.groupResults[mid] = GD.groupResults[mid];
-    GD = fresh;
-    syncQualActualFromResults();
+    // Write the in-memory GD as-is (it already has every score entered this
+    // session, including ones not yet confirmed by GitHub). We do NOT
+    // re-fetch and replace GD here — that previously caused a race where a
+    // slightly-stale read could wipe out a save that hadn't finished
+    // propagating yet, silently erasing earlier entries.
     await ghWrite(GD);
     if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
   }catch(e){
-    if(st){
+    if(e.message && e.message.indexOf('409')>-1){
+      // Real conflict: someone/something else changed the file. Re-fetch,
+      // re-apply ONLY this specific field on top of the new version, then retry.
+      try{
+        var fresh = await ghRead();
+        if(!fresh.groupResults) fresh.groupResults={};
+        if(!fresh.qualActual) fresh.qualActual={};
+        if(!fresh.groupResults[mid]) fresh.groupResults[mid]={s1:'',s2:''};
+        fresh.groupResults[mid][field] = val===''?'':parseInt(val,10);
+        GD = fresh;
+        syncQualActualFromResults();
+        await ghWrite(GD);
+        if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub (resolved conflict)';setTimeout(function(){if(st)st.style.display='none';},2500);}
+      }catch(e2){
+        if(st){st.style.color='var(--red)';st.innerHTML='❌ '+e2.message+'<br><button class="btn btn-red" style="margin-top:.5rem;font-size:.78rem;padding:.4rem .9rem" onclick="if(resetGhToken())setGroupResult(\''+g+'\',\''+mid+'\',\''+field+'\','+JSON.stringify(val)+')">🔑 Re-enter token &amp; retry</button>';st.style.display='block';}
+      }
+    } else if(st){
       st.style.color='var(--red)';
       st.innerHTML='❌ '+e.message+'<br><button class="btn btn-red" style="margin-top:.5rem;font-size:.78rem;padding:.4rem .9rem" onclick="if(resetGhToken())setGroupResult(\''+g+'\',\''+mid+'\',\''+field+'\','+JSON.stringify(val)+')">🔑 Re-enter token &amp; retry</button>';
       st.style.display='block';

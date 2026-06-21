@@ -411,7 +411,12 @@ var API = 'https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+DATA
 
 async function ghRead(){
   var r = await fetch(API+'?t='+Date.now(), ghToken?{headers:{Authorization:'token '+ghToken}}:{});
-  if(r.status===404) throw new Error('data.json not found in repo '+GH_OWNER+'/'+GH_REPO);
+  if(r.status===404){
+    if(ghToken) throw new Error('404 Not Found. This usually means your GitHub token is invalid, expired, or doesn\'t have access to "'+GH_OWNER+'/'+GH_REPO+'". Click "Re-enter token" below and create a fresh token with the "repo" scope (classic) or "Contents: Read and write" (fine-grained), making sure it includes this repository.');
+    throw new Error('data.json not found in repo '+GH_OWNER+'/'+GH_REPO+'. Check the repo name is correct and the file exists at the root.');
+  }
+  if(r.status===401) throw new Error('401 Unauthorized — your GitHub token is invalid or expired. Click "Re-enter token" below.');
+  if(r.status===403) throw new Error('403 Forbidden — your token doesn\'t have permission for this repo, or you hit a rate limit.');
   if(!r.ok) throw new Error('GitHub API error '+r.status);
   var j = await r.json();
   ghSha = j.sha;
@@ -419,7 +424,7 @@ async function ghRead(){
 }
 
 async function ghWrite(data){
-  if(!ghToken) throw new Error('No token');
+  if(!ghToken) throw new Error('No token set. Click "Re-enter token" below.');
   var json = JSON.stringify(data,null,2);
   var bytes = new TextEncoder().encode(json);
   var bin = '';
@@ -429,8 +434,21 @@ async function ghWrite(data){
     headers:{Authorization:'token '+ghToken,'Content-Type':'application/json'},
     body:JSON.stringify({message:'Update '+new Date().toISOString(),content:btoa(bin),sha:ghSha})
   });
-  if(!r.ok){var e=await r.json();throw new Error(e.message||'Write failed');}
+  if(r.status===404) throw new Error('404 Not Found on save. Your GitHub token is invalid, expired, or lacks write access to "'+GH_OWNER+'/'+GH_REPO+'". Click "Re-enter token" below and create a token with the "repo" scope (classic) or "Contents: Read and write" (fine-grained) for this repository.');
+  if(r.status===401) throw new Error('401 Unauthorized — your GitHub token is invalid or expired. Click "Re-enter token" below.');
+  if(r.status===403) throw new Error('403 Forbidden — your token doesn\'t have write permission for this repo.');
+  if(r.status===409) throw new Error('409 Conflict — the file changed on GitHub between your read and write. Try again.');
+  if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error((e.message||'Write failed')+' (HTTP '+r.status+')');}
   var j=await r.json();ghSha=j.content.sha;
+}
+
+// Clears the stored token so the admin can enter a fresh one
+function resetGhToken(){
+  ghToken='';
+  sessionStorage.removeItem('gh_token');
+  var tok=prompt('Enter a new GitHub Personal Access Token:\n\nMake sure it has the "repo" scope (classic token) or "Contents: Read and write" permission for the "'+GH_OWNER+'/'+GH_REPO+'" repository (fine-grained token).');
+  if(tok){ghToken=tok.trim();sessionStorage.setItem('gh_token',ghToken);}
+  return !!tok;
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────
@@ -956,6 +974,10 @@ function renderASetup(){
     '<div class="plist">'+inputs+'</div>'+
     '<button class="btn btn-green btn-full" onclick="saveAPlayers()">💾 Save Players</button>'+
     '<div id="ast" style="margin-top:.6rem;font-size:.8rem;font-weight:600;text-align:center"></div>'+
+    '<div style="margin-top:1rem;padding:.75rem 1rem;background:'+(ghToken?'#f0faf4':'#fff0f0')+';border:1px solid '+(ghToken?'var(--green)':'var(--red)')+';border-radius:10px;font-size:.82rem;color:'+(ghToken?'#1a6b3c':'#c0392b')+';display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+    '<span style="flex:1">'+(ghToken?'🔑 GitHub token is set for this session.':'⚠️ No GitHub token set — saving will fail.')+'</span>'+
+    '<button class="btn btn-red" style="font-size:.75rem;padding:.4rem .9rem" onclick="resetGhToken();renderASetup()">🔑 '+(ghToken?'Re-enter':'Enter')+' token</button>'+
+    '</div>'+
     '<div style="margin-top:1rem;padding:.75rem 1rem;background:#f0faf4;border:1px solid var(--green);border-radius:10px;font-size:.82rem;color:#1a6b3c">'+
     '<strong>⏰ Auto-unlock schedule:</strong><br>🔒 Predictions lock: June 17 at 10:00 PM ET<br>🥊 Round of 32 opens: June 28 at 3:00 PM ET<br>🥊 Round of 16+: July 4 at 1:00 PM ET</div>'+
     '<div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #e8e8e4">'+
@@ -1167,7 +1189,11 @@ async function setGroupResult(g,mid,field,val){
     await ghWrite(GD);
     if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
   }catch(e){
-    if(st){st.style.color='var(--red)';st.textContent='❌ Save failed: '+e.message+' — your change was NOT saved. Check your token in the prompt or re-login as admin.';st.style.display='block';}
+    if(st){
+      st.style.color='var(--red)';
+      st.innerHTML='❌ '+e.message+'<br><button class="btn btn-red" style="margin-top:.5rem;font-size:.78rem;padding:.4rem .9rem" onclick="if(resetGhToken())setGroupResult(\''+g+'\',\''+mid+'\',\''+field+'\','+JSON.stringify(val)+')">🔑 Re-enter token &amp; retry</button>';
+      st.style.display='block';
+    }
     else alert('Save failed: '+e.message);
   }
   renderAQual();

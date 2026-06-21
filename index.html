@@ -451,6 +451,34 @@ function resetGhToken(){
   return !!tok;
 }
 
+// ─── SAFE WRITE ───────────────────────────────────────────────────────────
+// Every admin action that saves data goes through this instead of calling
+// ghWrite(GD) directly. It always re-reads the freshest copy from GitHub
+// first, applies ONLY the specific change via the mutate() callback, then
+// writes that merged result back. This prevents one admin action (or an
+// old/stale browser tab) from silently overwriting data saved by a
+// different action in between — which previously caused entered scores to
+// disappear when an unrelated field was saved afterward.
+async function safeWrite(mutate){
+  var fresh;
+  try{
+    fresh = await ghRead();
+  }catch(e){
+    // If the re-read fails, fall back to writing current in-memory GD
+    // rather than losing the edit entirely.
+    fresh = GD;
+  }
+  if(!fresh.groupResults) fresh.groupResults={};
+  if(!fresh.qualActual) fresh.qualActual={};
+  if(!fresh.thirdsActual) fresh.thirdsActual=[];
+  if(!fresh.koResults) fresh.koResults={};
+  if(!fresh.predictions) fresh.predictions={};
+  if(!fresh.players) fresh.players=[];
+  mutate(fresh);
+  GD = fresh;
+  await ghWrite(GD);
+}
+
 // ─── SCORING ──────────────────────────────────────────────────────────────
 function score(name){
   var p=GD.predictions[name]||{};
@@ -795,9 +823,9 @@ async function doSubmit(){
   if(!ghToken){var tok=el('tok');if(tok&&tok.value.trim()){ghToken=tok.value.trim();sessionStorage.setItem('gh_token',ghToken);}else{if(st){st.style.color='var(--red)';st.textContent='⚠ Please enter the game token.';}btn.disabled=false;btn.textContent='✅ Submit My Predictions';return;}}
   if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';}
   try{
-    GD=await ghRead();
-    GD.predictions[currentPlayer]={qual:PP.qual,thirds:PP.thirds,ko:PP.ko,tw:PP.tw};
-    await ghWrite(GD);
+    await safeWrite(function(fresh){
+      fresh.predictions[currentPlayer]={qual:PP.qual,thirds:PP.thirds,ko:PP.ko,tw:PP.tw};
+    });
     var cont=el('pps');
     if(cont)cont.innerHTML='<div class="sub-ok"><div class="ck">✅</div><h3>Predictions Saved!</h3><p>Your picks are live. Come back anytime to update before the deadline.</p><button class="btn btn-green" style="margin-top:1rem" onclick="showHome()">← Back to home</button></div>';
     el('sticky').style.display='none';
@@ -993,10 +1021,12 @@ function renderASetup(){
 
 async function saveAPlayers(){
   var names=[];for(var i=0;i<11;i++){var v=el('adp'+i).value.trim();if(v)names.push(v);}
-  GD.players=names.length?names:['Player 1'];
+  var newPlayers=names.length?names:['Player 1'];
   var st=el('ast');if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';}
-  try{await ghWrite(GD);if(st){st.style.color='var(--green)';st.textContent='✅ Saved!';setTimeout(function(){st.textContent='';},3000);}}
-  catch(e){if(st){st.style.color='var(--red)';st.textContent='❌ '+e.message;}}
+  try{
+    await safeWrite(function(d){ d.players=newPlayers; });
+    if(st){st.style.color='var(--green)';st.textContent='✅ Saved!';setTimeout(function(){st.textContent='';},3000);}
+  }catch(e){if(st){st.style.color='var(--red)';st.textContent='❌ '+e.message;}}
 }
 
 async function doImport(){
@@ -1007,12 +1037,13 @@ async function doImport(){
     var pi=GD.players.map(pName).findIndex(function(n){return n.toLowerCase()===d.name.toLowerCase();});
     if(pi<0){st.style.color='var(--red)';st.textContent='⚠ Player "'+d.name+'" not found.';return;}
     var name=pName(GD.players[pi]);
-    if(!GD.predictions[name])GD.predictions[name]={};
-    if(d.qual)GD.predictions[name].qual=d.qual;
-    if(d.thirds)GD.predictions[name].thirds=d.thirds;
-    if(d.ko)GD.predictions[name].ko=d.ko;
-    if(d.tw)GD.predictions[name].tw=d.tw;
-    await ghWrite(GD);
+    await safeWrite(function(fresh){
+      if(!fresh.predictions[name])fresh.predictions[name]={};
+      if(d.qual)fresh.predictions[name].qual=d.qual;
+      if(d.thirds)fresh.predictions[name].thirds=d.thirds;
+      if(d.ko)fresh.predictions[name].ko=d.ko;
+      if(d.tw)fresh.predictions[name].tw=d.tw;
+    });
     st.style.color='var(--green)';st.textContent='✅ Imported for '+name+'!';el('impi').value='';
   }catch(e){st.style.color='var(--red)';st.textContent='⚠ Invalid code.';}
 }
@@ -1171,38 +1202,26 @@ function renderAQual(){
 }
 
 async function setGroupResult(g,mid,field,val){
+  // Update the local UI immediately for responsiveness
   if(!GD.groupResults) GD.groupResults={};
   if(!GD.groupResults[mid]) GD.groupResults[mid]={s1:'',s2:''};
   GD.groupResults[mid][field] = val===''?'':parseInt(val,10);
   syncQualActualFromResults();
+
   var st=el('aqsavestatus');
   if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';st.style.display='block';}
   try{
-    // Write the in-memory GD as-is (it already has every score entered this
-    // session, including ones not yet confirmed by GitHub). We do NOT
-    // re-fetch and replace GD here — that previously caused a race where a
-    // slightly-stale read could wipe out a save that hadn't finished
-    // propagating yet, silently erasing earlier entries.
-    await ghWrite(GD);
+    // Always re-read the freshest copy from GitHub and merge ONLY this one
+    // field into it before saving — this guarantees we never overwrite
+    // scores entered moments earlier (even from a different tab/session).
+    await safeWrite(function(fresh){
+      if(!fresh.groupResults[mid]) fresh.groupResults[mid]={s1:'',s2:''};
+      fresh.groupResults[mid][field] = val===''?'':parseInt(val,10);
+    });
+    syncQualActualFromResults();
     if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
   }catch(e){
-    if(e.message && e.message.indexOf('409')>-1){
-      // Real conflict: someone/something else changed the file. Re-fetch,
-      // re-apply ONLY this specific field on top of the new version, then retry.
-      try{
-        var fresh = await ghRead();
-        if(!fresh.groupResults) fresh.groupResults={};
-        if(!fresh.qualActual) fresh.qualActual={};
-        if(!fresh.groupResults[mid]) fresh.groupResults[mid]={s1:'',s2:''};
-        fresh.groupResults[mid][field] = val===''?'':parseInt(val,10);
-        GD = fresh;
-        syncQualActualFromResults();
-        await ghWrite(GD);
-        if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub (resolved conflict)';setTimeout(function(){if(st)st.style.display='none';},2500);}
-      }catch(e2){
-        if(st){st.style.color='var(--red)';st.innerHTML='❌ '+e2.message+'<br><button class="btn btn-red" style="margin-top:.5rem;font-size:.78rem;padding:.4rem .9rem" onclick="if(resetGhToken())setGroupResult(\''+g+'\',\''+mid+'\',\''+field+'\','+JSON.stringify(val)+')">🔑 Re-enter token &amp; retry</button>';st.style.display='block';}
-      }
-    } else if(st){
+    if(st){
       st.style.color='var(--red)';
       st.innerHTML='❌ '+e.message+'<br><button class="btn btn-red" style="margin-top:.5rem;font-size:.78rem;padding:.4rem .9rem" onclick="if(resetGhToken())setGroupResult(\''+g+'\',\''+mid+'\',\''+field+'\','+JSON.stringify(val)+')">🔑 Re-enter token &amp; retry</button>';
       st.style.display='block';
@@ -1238,7 +1257,12 @@ function renderAThirds(){
 
 async function setAThird(i,val){
   if(!GD.thirdsActual)GD.thirdsActual=[];GD.thirdsActual[i]=val;
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+  try{
+    await safeWrite(function(fresh){
+      if(!fresh.thirdsActual)fresh.thirdsActual=[];
+      fresh.thirdsActual[i]=val;
+    });
+  }catch(e){alert('Save failed: '+e.message);}
   renderAThirds();
 }
 
@@ -1280,7 +1304,12 @@ function setAKO(round,btn){
 
 async function setAKORes(mid,val){
   GD.koResults[mid]=val;
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+  try{
+    await safeWrite(function(fresh){
+      if(!fresh.koResults)fresh.koResults={};
+      fresh.koResults[mid]=val;
+    });
+  }catch(e){alert('Save failed: '+e.message);}
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
   var g=el('akogrid');if(g)g.innerHTML=akoCards(RCL);
 }
@@ -1303,7 +1332,9 @@ function renderATW(){
 
 async function setATWActual(val){
   GD.twActual=val;
-  try{await ghWrite(GD);}catch(e){alert('Save failed: '+e.message);}
+  try{
+    await safeWrite(function(fresh){ fresh.twActual=val; });
+  }catch(e){alert('Save failed: '+e.message);}
   renderATW();
 }
 
@@ -1336,6 +1367,31 @@ function parseDate(dateStr,timeStr){
     d.setUTCHours(hh-offset,mm,0,0);
     return d;
   }catch(e){return new Date(dateStr+'T12:00:00Z');}
+}
+
+// Formats the match's ORIGINAL stadium-local kickoff time (e.g. "12:00 PM ET")
+// directly from the source string, without converting through the viewer's
+// own device timezone. This is what we want to display — the local kickoff
+// time at the venue, same as how broadcasters list it.
+var TZ_LABELS={'-4':'ET','-5':'CT','-6':'CT','-7':'PT','-8':'PT'};
+function formatVenueTime(dateStr,timeStr){
+  if(!dateStr||!timeStr) return '';
+  try{
+    var sp=timeStr.lastIndexOf(' ');
+    var hhmm=timeStr.substring(0,sp).trim();       // "12:00"
+    var utcRaw=timeStr.substring(sp+1).trim();      // "UTC-4"
+    var offsetNum=utcRaw.replace('UTC','');         // "-4"
+    var parts=hhmm.split(':');
+    var hh=parseInt(parts[0]);var mm=parseInt(parts[1])||0;
+    var ampm=hh>=12?'PM':'AM';
+    var hh12=hh%12;if(hh12===0)hh12=12;
+    var mmStr=mm<10?'0'+mm:''+mm;
+    var tzLabel=TZ_LABELS[offsetNum]||('UTC'+offsetNum);
+    // Date display, e.g. "Sun, Jun 21"
+    var dObj=new Date(dateStr+'T00:00:00Z');
+    var dateLabel=dObj.toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'});
+    return dateLabel+', '+hh12+':'+mmStr+' '+ampm+' '+tzLabel;
+  }catch(e){return '';}
 }
 
 function matchStatus(m){
@@ -1466,7 +1522,7 @@ function renderScores(){
     var home=m.team1||'?';var away=m.team2||'?';
     var group=m.group||'';var ground=m.ground||'';
     var mu=parseDate(m.date,m.time);
-    var kStr=mu?mu.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    var kStr=formatVenueTime(m.date,m.time);
     var g1=m.goals1||[];var g2=m.goals2||[];
     var sh=g1.map(function(g){return '<div class="sscorer"><strong>'+g.name+'</strong>'+(g.minute?' '+g.minute+"'":'')+(g.offset?'+'+g.offset:'')+'</div>';}).join('');
     var sa2=g2.map(function(g){return '<div class="sscorer"><strong>'+g.name+'</strong>'+(g.minute?' '+g.minute+"'":'')+(g.offset?'+'+g.offset:'')+'</div>';}).join('');

@@ -453,18 +453,23 @@ function resetGhToken(){
 
 // ─── SAFE WRITE ───────────────────────────────────────────────────────────
 // Every admin action that saves data goes through this instead of calling
-// ghWrite(GD) directly. It always re-reads the freshest copy from GitHub
-// first, applies ONLY the specific change via the mutate() callback, then
-// writes that merged result back. This prevents one admin action (or an
-// old/stale browser tab) from silently overwriting data saved by a
-// different action in between — which previously caused entered scores to
-// disappear when an unrelated field was saved afterward.
+// ghWrite(GD) directly.
 //
-// IMPORTANT: writes are serialized through writeQueue. If two scores are
-// entered quickly (e.g. Mexico's score then South Africa's score for the
-// same match), the second write must wait for the first to fully finish
-// and update GD before it reads — otherwise it can read a version of
-// data.json that doesn't have the first score yet, and overwrite it.
+// IMPORTANT — why this does NOT re-read from GitHub before every write:
+// GitHub's Contents API does not guarantee a read immediately after a write
+// reflects that write (eventual consistency / CDN caching on raw reads).
+// Re-reading before every keystroke-driven save (e.g. entering Mexico's
+// score, then immediately South Africa's score for the same match) could
+// fetch a version of data.json from BEFORE the first save had propagated,
+// silently discarding it when the second save's merge was based on that
+// stale snapshot.
+//
+// Instead: the in-memory GD object is the single source of truth for the
+// whole admin session (it already accumulates every score you enter,
+// in order, since they all mutate the same object). Writes are serialized
+// through writeQueue so they hit GitHub strictly one after another, each
+// one carrying forward the sha returned by the previous write — so no
+// read-after-write race is possible.
 var writeQueue = Promise.resolve();
 function safeWrite(mutate){
   var result = writeQueue.then(function(){
@@ -477,22 +482,13 @@ function safeWrite(mutate){
 }
 
 async function doSafeWrite(mutate){
-  var fresh;
-  try{
-    fresh = await ghRead();
-  }catch(e){
-    // If the re-read fails, fall back to writing current in-memory GD
-    // rather than losing the edit entirely.
-    fresh = GD;
-  }
-  if(!fresh.groupResults) fresh.groupResults={};
-  if(!fresh.qualActual) fresh.qualActual={};
-  if(!fresh.thirdsActual) fresh.thirdsActual=[];
-  if(!fresh.koResults) fresh.koResults={};
-  if(!fresh.predictions) fresh.predictions={};
-  if(!fresh.players) fresh.players=[];
-  mutate(fresh);
-  GD = fresh;
+  if(!GD.groupResults) GD.groupResults={};
+  if(!GD.qualActual) GD.qualActual={};
+  if(!GD.thirdsActual) GD.thirdsActual=[];
+  if(!GD.koResults) GD.koResults={};
+  if(!GD.predictions) GD.predictions={};
+  if(!GD.players) GD.players=[];
+  mutate(GD);
   await ghWrite(GD);
 }
 
@@ -1228,14 +1224,15 @@ async function setGroupResult(g,mid,field,val){
   var st=el('aqsavestatus');
   if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';st.style.display='block';}
   try{
-    // Always re-read the freshest copy from GitHub and merge ONLY this one
-    // field into it before saving — this guarantees we never overwrite
-    // scores entered moments earlier (even from a different tab/session).
-    await safeWrite(function(fresh){
-      if(!fresh.groupResults[mid]) fresh.groupResults[mid]={s1:'',s2:''};
-      fresh.groupResults[mid][field] = val===''?'':parseInt(val,10);
+    // GD already has this change applied above. safeWrite serializes the
+    // actual GitHub write so concurrent score entries (e.g. Mexico then
+    // South Africa) never race each other — each write waits its turn and
+    // uses the sha confirmed by the previous write, with no GitHub re-read
+    // in between (avoids GitHub's read-after-write consistency lag).
+    await safeWrite(function(d){
+      if(!d.groupResults[mid]) d.groupResults[mid]={s1:'',s2:''};
+      d.groupResults[mid][field] = val===''?'':parseInt(val,10);
     });
-    syncQualActualFromResults();
     if(st){st.style.color='var(--green)';st.textContent='✅ Saved to GitHub';setTimeout(function(){if(st)st.style.display='none';},2500);}
   }catch(e){
     if(st){

@@ -410,9 +410,14 @@ var curPKO = 'Round of 32';
 var API = 'https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+DATA_FILE;
 
 async function ghRead(){
-  var headers = {'Cache-Control':'no-cache, no-store, must-revalidate', 'Pragma':'no-cache'};
+  var headers = {};
   if(ghToken) headers.Authorization = 'token '+ghToken;
-  var r = await fetch(API+'?t='+Date.now(), {headers:headers, cache:'no-store'});
+  var r;
+  try{
+    r = await fetch(API+'?t='+Date.now(), {headers:headers});
+  }catch(networkErr){
+    throw new Error('Network request to GitHub failed ('+networkErr.message+'). Check your internet connection, or that '+GH_OWNER+'/'+GH_REPO+' is reachable.');
+  }
   if(r.status===404){
     if(ghToken) throw new Error('404 Not Found. This usually means your GitHub token is invalid, expired, or doesn\'t have access to "'+GH_OWNER+'/'+GH_REPO+'". Click "Re-enter token" below and create a fresh token with the "repo" scope (classic) or "Contents: Read and write" (fine-grained), making sure it includes this repository.');
     throw new Error('data.json not found in repo '+GH_OWNER+'/'+GH_REPO+'. Check the repo name is correct and the file exists at the root.');
@@ -431,11 +436,16 @@ async function ghWrite(data){
   var bytes = new TextEncoder().encode(json);
   var bin = '';
   bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-  var r = await fetch(API,{
-    method:'PUT',
-    headers:{Authorization:'token '+ghToken,'Content-Type':'application/json'},
-    body:JSON.stringify({message:'Update '+new Date().toISOString(),content:btoa(bin),sha:ghSha})
-  });
+  var r;
+  try{
+    r = await fetch(API,{
+      method:'PUT',
+      headers:{Authorization:'token '+ghToken,'Content-Type':'application/json'},
+      body:JSON.stringify({message:'Update '+new Date().toISOString(),content:btoa(bin),sha:ghSha})
+    });
+  }catch(networkErr){
+    throw new Error('Network request to GitHub failed ('+networkErr.message+'). Your change was NOT saved — check your connection and try again.');
+  }
   if(r.status===404) throw new Error('404 Not Found on save. Your GitHub token is invalid, expired, or lacks write access to "'+GH_OWNER+'/'+GH_REPO+'". Click "Re-enter token" below and create a token with the "repo" scope (classic) or "Contents: Read and write" (fine-grained) for this repository.');
   if(r.status===401) throw new Error('401 Unauthorized — your GitHub token is invalid or expired. Click "Re-enter token" below.');
   if(r.status===403) throw new Error('403 Forbidden — your token doesn\'t have write permission for this repo.');
@@ -444,28 +454,6 @@ async function ghWrite(data){
   var j=await r.json();
   if(!j.content || !j.content.sha) throw new Error('Save appeared to succeed but GitHub did not confirm the new file — please verify manually and retry.');
   ghSha=j.content.sha;
-
-  // Verify the write actually landed by reading back what GitHub now has
-  // for this commit and confirming it matches what we sent. GitHub's PUT
-  // response includes the commit but not always the full content body for
-  // larger files, so we do one confirmatory GET using the new sha.
-  try{
-    var verifyR = await fetch(API+'?ref='+j.commit.sha+'&t='+Date.now(), {headers:{Authorization:'token '+ghToken}});
-    if(verifyR.ok){
-      var verifyJ = await verifyR.json();
-      var verifyContent = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(verifyJ.content.replace(/\n/g,'')),function(c){return c.charCodeAt(0);})));
-      var sentMatchCount = Object.keys(data.groupResults||{}).length;
-      var savedMatchCount = Object.keys(verifyContent.groupResults||{}).length;
-      if(savedMatchCount < sentMatchCount){
-        throw new Error('Save verification failed: expected '+sentMatchCount+' match result(s) but GitHub only shows '+savedMatchCount+' after saving. The write may not have fully landed — please re-enter your scores or refresh and check before continuing.');
-      }
-    }
-  }catch(verifyErr){
-    // If verification itself fails (network blip, etc.) don't block the
-    // user — the primary write already succeeded per GitHub's response.
-    // Only re-throw if it's our own explicit mismatch error above.
-    if(verifyErr.message && verifyErr.message.indexOf('Save verification failed')===0) throw verifyErr;
-  }
 }
 
 // Clears the stored token so the admin can enter a fresh one

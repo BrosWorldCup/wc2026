@@ -1372,6 +1372,35 @@ function stopRefresh(){
 
 // Shared loader: fetch + parse the openfootball JSON into a flat match array.
 // Used by both Live Scores and Standings so we don't fetch twice.
+//
+// Current schema (top-level "matches" array, no "rounds" wrapper):
+//   { date, time: "12:00 UTC-4" (offset embedded — do NOT append a separate
+//     timezone field), team1, team2 (plain strings),
+//     score: { ft: [home, away], ht: [home, away] }  (absent until played),
+//     goals1, goals2, group, ground }
+function parseMatchEntry(m, fallbackGroup){
+  var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
+  var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
+  // m.time already includes its own "UTC±N" offset (e.g. "12:00 UTC-4") —
+  // pass it straight through to parseDate without appending anything else.
+  var timeStr=m.time||null;
+  var ft=m.score&&m.score.ft;
+  var ht=m.score&&m.score.ht;
+  return {
+    date:m.date,
+    time:timeStr,
+    group:m.group||fallbackGroup||'',
+    ground:m.ground||(m.stadium?m.stadium.name:'')||m.city||'',
+    team1:t1,team2:t2,
+    score1:(ft&&ft[0]!=null)?ft[0]:(m.score1!=null?m.score1:null),
+    score2:(ft&&ft[1]!=null)?ft[1]:(m.score2!=null?m.score2:null),
+    score1i:(ht&&ht[0]!=null)?ht[0]:(m.score1i!=null?m.score1i:null),
+    score2i:(ht&&ht[1]!=null)?ht[1]:(m.score2i!=null?m.score2i:null),
+    goals1:m.goals1||[],
+    goals2:m.goals2||[]
+  };
+}
+
 async function loadMatches(){
   var r=await fetch(OF_URL+'?t='+Date.now());
   if(!r.ok)throw new Error('HTTP '+r.status);
@@ -1379,28 +1408,10 @@ async function loadMatches(){
   var all=[];
   if(Array.isArray(json.rounds)){
     json.rounds.forEach(function(round){
-      (round.matches||[]).forEach(function(m){
-        var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
-        var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
-        var tz=m.timezone||'UTC+0';
-        var timeStr=m.time?(m.time+' '+tz):null;
-        all.push({date:m.date,time:timeStr,group:m.group||round.name||'',ground:m.stadium?m.stadium.name:m.city||'',
-          team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
-          score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
-          goals1:m.goals1||[],goals2:m.goals2||[]});
-      });
+      (round.matches||[]).forEach(function(m){ all.push(parseMatchEntry(m, round.name)); });
     });
   } else if(Array.isArray(json.matches)){
-    json.matches.forEach(function(m){
-      var t1=typeof m.team1==='string'?m.team1:(m.team1&&m.team1.name?m.team1.name:'?');
-      var t2=typeof m.team2==='string'?m.team2:(m.team2&&m.team2.name?m.team2.name:'?');
-      var tz=m.timezone||'UTC+0';
-      var timeStr=m.time?(m.time+' '+tz):null;
-      all.push({date:m.date,time:timeStr,group:m.group||m.round||'',ground:m.stadium?m.stadium.name:m.city||'',
-        team1:t1,team2:t2,score1:m.score1!=null?m.score1:null,score2:m.score2!=null?m.score2:null,
-        score1i:m.score1i!=null?m.score1i:null,score2i:m.score2i!=null?m.score2i:null,
-        goals1:m.goals1||[],goals2:m.goals2||[]});
-    });
+    json.matches.forEach(function(m){ all.push(parseMatchEntry(m, m.round)); });
   }
   return all;
 }

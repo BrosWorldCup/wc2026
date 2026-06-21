@@ -459,7 +459,24 @@ function resetGhToken(){
 // old/stale browser tab) from silently overwriting data saved by a
 // different action in between — which previously caused entered scores to
 // disappear when an unrelated field was saved afterward.
-async function safeWrite(mutate){
+//
+// IMPORTANT: writes are serialized through writeQueue. If two scores are
+// entered quickly (e.g. Mexico's score then South Africa's score for the
+// same match), the second write must wait for the first to fully finish
+// and update GD before it reads — otherwise it can read a version of
+// data.json that doesn't have the first score yet, and overwrite it.
+var writeQueue = Promise.resolve();
+function safeWrite(mutate){
+  var result = writeQueue.then(function(){
+    return doSafeWrite(mutate);
+  });
+  // Keep the queue chain alive even if this particular write fails, so
+  // later writes still get a turn instead of being stuck forever.
+  writeQueue = result.catch(function(){});
+  return result;
+}
+
+async function doSafeWrite(mutate){
   var fresh;
   try{
     fresh = await ghRead();

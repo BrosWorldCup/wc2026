@@ -13,12 +13,7 @@
     "Mohamad"
   ],
   "unlocked": false,
-  "qualActual": {
-    "A": [
-      "",
-      ""
-    ]
-  },
+  "qualActual": {},
   "thirdsActual": [],
   "koResults": {},
   "twActual": "",
@@ -741,5 +736,6 @@
     "Samer": "Fifa1",
     "Belal": "1234",
     "Hussein": "hussein"
-  }
+  },
+  "groupResults": {}
 }

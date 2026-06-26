@@ -410,11 +410,11 @@ var curPKO = 'Round of 32';
 var API = 'https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+DATA_FILE;
 
 async function ghRead(){
-  var headers = {};
+  var headers = {'Cache-Control':'no-cache'};
   if(ghToken) headers.Authorization = 'token '+ghToken;
   var r;
   try{
-    r = await fetch(API+'?t='+Date.now(), {headers:headers});
+    r = await fetch(API+'?t='+Date.now(), {headers:headers, cache:'no-store'});
   }catch(networkErr){
     throw new Error('Network request to GitHub failed ('+networkErr.message+'). Check your internet connection, or that '+GH_OWNER+'/'+GH_REPO+' is reachable.');
   }

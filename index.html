@@ -459,9 +459,9 @@ async function ghWrite(data){
 // Clears the stored token so the admin can enter a fresh one
 function resetGhToken(){
   ghToken='';
-  sessionStorage.removeItem('gh_token');
+  localStorage.removeItem('gh_token');
   var tok=prompt('Enter a new GitHub Personal Access Token:\n\nMake sure it has the "repo" scope (classic token) or "Contents: Read and write" permission for the "'+GH_OWNER+'/'+GH_REPO+'" repository (fine-grained token).');
-  if(tok){ghToken=tok.trim();sessionStorage.setItem('gh_token',ghToken);}
+  if(tok){ghToken=tok.trim();localStorage.setItem('gh_token',ghToken);}
   return !!tok;
 }
 
@@ -566,7 +566,7 @@ function sel(opts,val,onch,cls){
 // ─── INIT ─────────────────────────────────────────────────────────────────
 async function init(){
   showLoading('Loading game data…');
-  ghToken = sessionStorage.getItem('gh_token')||'';
+  ghToken = localStorage.getItem('gh_token')||'';
   if(GH_OWNER==='YOUR_GITHUB_USERNAME'){
     showMain('<div class="card" style="max-width:480px;margin:0 auto;text-align:center"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--green);margin-bottom:.5rem">Setup Required</h3><p style="font-size:.85rem;color:var(--gray-mid)">Fill in GH_OWNER, GH_REPO and ADMIN_PASSWORD in the script.</p></div>');
     return;
@@ -847,7 +847,7 @@ function validatePP(){
 async function doSubmit(){
   var st=el('subst');var btn=document.querySelector('#pps .btn-gold');
   btn.disabled=true;btn.textContent='Saving…';
-  if(!ghToken){var tok=el('tok');if(tok&&tok.value.trim()){ghToken=tok.value.trim();sessionStorage.setItem('gh_token',ghToken);}else{if(st){st.style.color='var(--red)';st.textContent='⚠ Please enter the game token.';}btn.disabled=false;btn.textContent='✅ Submit My Predictions';return;}}
+  if(!ghToken){var tok=el('tok');if(tok&&tok.value.trim()){ghToken=tok.value.trim();localStorage.setItem('gh_token',ghToken);}else{if(st){st.style.color='var(--red)';st.textContent='⚠ Please enter the game token.';}btn.disabled=false;btn.textContent='✅ Submit My Predictions';return;}}
   if(st){st.style.color='var(--gray-mid)';st.textContent='Saving…';}
   try{
     await safeWrite(function(fresh){
@@ -859,7 +859,7 @@ async function doSubmit(){
   }catch(e){
     if(st){st.style.color='var(--red)';st.textContent='❌ '+e.message;}
     btn.disabled=false;btn.textContent='✅ Submit My Predictions';
-    ghToken='';sessionStorage.removeItem('gh_token');
+    ghToken='';localStorage.removeItem('gh_token');
   }
 }
 
@@ -992,7 +992,7 @@ function doAdminLogin(){
   var pw=el('apw').value;
   if(pw===ADMIN_PASSWORD){
     isAdmin=true;
-    if(!ghToken){var tok=prompt('Enter your GitHub Personal Access Token:');if(!tok)return;ghToken=tok.trim();sessionStorage.setItem('gh_token',ghToken);}
+    if(!ghToken){var tok=prompt('Enter your GitHub Personal Access Token:');if(!tok)return;ghToken=tok.trim();localStorage.setItem('gh_token',ghToken);}
     location.hash='admin';
     el('hsub').textContent='Admin Panel';el('pbadge').style.display='none';
     el('anav').style.display='flex';el('pnav').style.display='none';
@@ -1001,7 +1001,7 @@ function doAdminLogin(){
   } else {el('lerr').textContent='❌ Incorrect password';}
 }
 
-function adminLogout(){isAdmin=false;ghToken='';sessionStorage.removeItem('gh_token');location.hash='';showWelcome();}
+function adminLogout(){isAdmin=false;ghToken='';localStorage.removeItem('gh_token');location.hash='';showWelcome();}
 
 // ─── ADMIN TABS ───────────────────────────────────────────────────────────
 function showTab(tab,btn){

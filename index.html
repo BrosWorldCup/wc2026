@@ -345,7 +345,7 @@ tbody td:nth-child(2){text-align:left;}
 <div id="sticky"><button onclick="goSubmit()">📤 Submit Predictions</button></div>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
-const GH_OWNER = 'BrosWorldCup';
+const GH_OWNER = 'brosworldcup';
 const GH_REPO  = 'wc2026';
 const DATA_FILE = 'data.json';
 const ADMIN_PASSWORD = 'WorldCup26';
@@ -410,7 +410,7 @@ var curPKO = 'Round of 32';
 var API = 'https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+DATA_FILE;
 
 async function ghRead(){
-  var headers = {'Cache-Control':'no-cache'};
+  var headers = {};
   if(ghToken) headers.Authorization = 'token '+ghToken;
   var r;
   try{

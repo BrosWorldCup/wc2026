@@ -29,6 +29,10 @@
     "D": [
       "USA",
       "Australia"
+    ],
+    "E": [
+      "Germany",
+      "Ivory Coast"
     ]
   },
   "thirdsActual": [],
@@ -873,7 +877,7 @@
     },
     "gm_E_1_2": {
       "s1": 0,
-      "s2": ""
+      "s2": 2
     }
   }
 }

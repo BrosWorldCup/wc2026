@@ -33,6 +33,10 @@
     "E": [
       "Germany",
       "Ivory Coast"
+    ],
+    "F": [
+      "Netherlands",
+      "Japan"
     ]
   },
   "thirdsActual": [],
@@ -901,7 +905,7 @@
     },
     "gm_F_1_2": {
       "s1": 1,
-      "s2": ""
+      "s2": 1
     }
   }
 }

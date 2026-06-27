@@ -737,5 +737,10 @@
     "Belal": "1234",
     "Hussein": "hussein"
   },
-  "groupResults": {}
+  "groupResults": {
+    "gm_A_0_1": {
+      "s1": 2,
+      "s2": ""
+    }
+  }
 }

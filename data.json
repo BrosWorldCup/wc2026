@@ -45,6 +45,10 @@
     "H": [
       "Spain",
       "Cape Verde"
+    ],
+    "I": [
+      "France",
+      "Norway"
     ]
   },
   "thirdsActual": [],
@@ -985,7 +989,7 @@
     },
     "gm_I_2_3": {
       "s1": 1,
-      "s2": ""
+      "s2": 4
     }
   }
 }

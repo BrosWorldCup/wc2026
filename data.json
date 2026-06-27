@@ -21,6 +21,10 @@
     "B": [
       "Switzerland",
       "Canada"
+    ],
+    "C": [
+      "Brazil",
+      "Morocco"
     ]
   },
   "thirdsActual": [],
@@ -817,7 +821,7 @@
     },
     "gm_C_2_3": {
       "s1": 0,
-      "s2": ""
+      "s2": 1
     }
   }
 }

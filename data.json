@@ -25,6 +25,10 @@
     "C": [
       "Brazil",
       "Morocco"
+    ],
+    "D": [
+      "USA",
+      "Australia"
     ]
   },
   "thirdsActual": [],
@@ -845,7 +849,7 @@
     },
     "gm_D_2_3": {
       "s1": 2,
-      "s2": ""
+      "s2": 0
     }
   }
 }

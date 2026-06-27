@@ -41,6 +41,10 @@
     "G": [
       "Belgium",
       "Egypt"
+    ],
+    "H": [
+      "Spain",
+      "Cape Verde"
     ]
   },
   "thirdsActual": [],
@@ -957,7 +961,7 @@
     },
     "gm_H_2_3": {
       "s1": 1,
-      "s2": ""
+      "s2": 1
     }
   }
 }

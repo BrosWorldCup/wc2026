@@ -390,12 +390,12 @@ const R32_FIXTURES = [
   {id:'ko_Round_of_32_8',  label:'Match 8',  date:'Jul 1',  teams:['England','Congo DR']},
   {id:'ko_Round_of_32_9',  label:'Match 9',  date:'Jul 1',  teams:['Belgium','Senegal']},
   {id:'ko_Round_of_32_10', label:'Match 10', date:'Jul 1',  teams:['USA','Bosnia-Herzegovina']},
-  {id:'ko_Round_of_32_11', label:'Match 11', date:'Jul 2',  teams:['Australia','Egypt']},
-  {id:'ko_Round_of_32_12', label:'Match 12', date:'Jul 2',  teams:['Argentina','Cape Verde']},
-  {id:'ko_Round_of_32_13', label:'Match 13', date:'Jul 2',  teams:['Colombia','Ghana']},
-  {id:'ko_Round_of_32_14', label:'Match 14', date:'Jul 3',  teams:['Spain','Austria']},
-  {id:'ko_Round_of_32_15', label:'Match 15', date:'Jul 3',  teams:['Portugal','Croatia']},
-  {id:'ko_Round_of_32_16', label:'Match 16', date:'Jul 3',  teams:['Switzerland','Algeria']},
+  {id:'ko_Round_of_32_11', label:'Match 11', date:'Jul 2',  teams:['Spain','Austria']},
+  {id:'ko_Round_of_32_12', label:'Match 12', date:'Jul 2',  teams:['Portugal','Croatia']},
+  {id:'ko_Round_of_32_13', label:'Match 13', date:'Jul 2',  teams:['Switzerland','Algeria']},
+  {id:'ko_Round_of_32_14', label:'Match 14', date:'Jul 3',  teams:['Australia','Egypt']},
+  {id:'ko_Round_of_32_15', label:'Match 15', date:'Jul 3',  teams:['Argentina','Cape Verde']},
+  {id:'ko_Round_of_32_16', label:'Match 16', date:'Jul 3',  teams:['Colombia','Ghana']},
 ];
 const KO_MATCHES = [];
 R32_FIXTURES.forEach(function(f){
@@ -796,7 +796,9 @@ function renderPK(){
   matches.forEach(function(m){
     var pred=PP.ko[m.id]||'';
     var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
+    var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
     cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+
+      matchupTitle+
       '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
       '<option value="">— Pick winner —</option>';
     var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
@@ -817,7 +819,9 @@ function setPKO(round,btn){
   g.innerHTML=matches.map(function(m){
     var pred=PP.ko[m.id]||'';
     var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
+    var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
     var s='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[round]+'">'+round+' · '+m.label+dateStr+'</div>'+
+      matchupTitle+
       '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
       '<option value="">— Pick winner —</option>';
     var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;

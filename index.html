@@ -378,8 +378,31 @@ const KO_DEF = [
   {k:'3rd Place',n:1,cls:'ktp',tab:'tp'},
   {k:'Final',n:1,cls:'kf',tab:'f'}
 ];
+// Round of 32 fixtures — official FIFA schedule (June 28 – July 3, 2026)
+const R32_FIXTURES = [
+  {id:'ko_Round_of_32_1',  label:'Match 1',  date:'Jun 28', teams:['South Africa','Canada']},
+  {id:'ko_Round_of_32_2',  label:'Match 2',  date:'Jun 29', teams:['Brazil','Japan']},
+  {id:'ko_Round_of_32_3',  label:'Match 3',  date:'Jun 29', teams:['Germany','Paraguay']},
+  {id:'ko_Round_of_32_4',  label:'Match 4',  date:'Jun 29', teams:['Netherlands','Morocco']},
+  {id:'ko_Round_of_32_5',  label:'Match 5',  date:'Jun 30', teams:['Ivory Coast','Norway']},
+  {id:'ko_Round_of_32_6',  label:'Match 6',  date:'Jun 30', teams:['France','Sweden']},
+  {id:'ko_Round_of_32_7',  label:'Match 7',  date:'Jun 30', teams:['Mexico','Ecuador']},
+  {id:'ko_Round_of_32_8',  label:'Match 8',  date:'Jul 1',  teams:['England','Congo DR']},
+  {id:'ko_Round_of_32_9',  label:'Match 9',  date:'Jul 1',  teams:['Belgium','Senegal']},
+  {id:'ko_Round_of_32_10', label:'Match 10', date:'Jul 1',  teams:['USA','Bosnia-Herzegovina']},
+  {id:'ko_Round_of_32_11', label:'Match 11', date:'Jul 2',  teams:['Australia','Egypt']},
+  {id:'ko_Round_of_32_12', label:'Match 12', date:'Jul 2',  teams:['Argentina','Cape Verde']},
+  {id:'ko_Round_of_32_13', label:'Match 13', date:'Jul 2',  teams:['Colombia','Ghana']},
+  {id:'ko_Round_of_32_14', label:'Match 14', date:'Jul 3',  teams:['Spain','Austria']},
+  {id:'ko_Round_of_32_15', label:'Match 15', date:'Jul 3',  teams:['Portugal','Croatia']},
+  {id:'ko_Round_of_32_16', label:'Match 16', date:'Jul 3',  teams:['Switzerland','Algeria']},
+];
 const KO_MATCHES = [];
+R32_FIXTURES.forEach(function(f){
+  KO_MATCHES.push({id:f.id,round:'Round of 32',label:f.label,date:f.date,teams:f.teams,cls:'kr32',tab:'r32'});
+});
 KO_DEF.forEach(function(d){
+  if(d.k==='Round of 32') return; // already added above
   for(var i=1;i<=d.n;i++) KO_MATCHES.push({id:'ko_'+d.k.replace(/\s/g,'_')+'_'+i,round:d.k,label:'Match '+i,cls:d.cls,tab:d.tab});
 });
 
@@ -772,10 +795,12 @@ function renderPK(){
   var cardsHtml='<div class="mgrid" id="pkogrid">';
   matches.forEach(function(m){
     var pred=PP.ko[m.id]||'';
-    cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+'</div>'+
+    var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
+    cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+
       '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
       '<option value="">— Pick winner —</option>';
-    ALL_TEAMS.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
+    var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
+    teamList.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
     cardsHtml+='</select></div>';
   });
   cardsHtml+='</div>';
@@ -791,10 +816,12 @@ function setPKO(round,btn){
   var matches=KO_MATCHES.filter(function(m){return m.round===round;});
   g.innerHTML=matches.map(function(m){
     var pred=PP.ko[m.id]||'';
-    var s='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[round]+'">'+round+' · '+m.label+'</div>'+
+    var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
+    var s='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[round]+'">'+round+' · '+m.label+dateStr+'</div>'+
       '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
       '<option value="">— Pick winner —</option>';
-    ALL_TEAMS.forEach(function(t){s+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
+    var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
+    teamList.forEach(function(t){s+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
     return s+'</select></div>';
   }).join('');
 }

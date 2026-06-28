@@ -57,6 +57,10 @@
     "K": [
       "Colombia",
       "Portugal"
+    ],
+    "L": [
+      "England",
+      "Croatia"
     ]
   },
   "thirdsActual": [],
@@ -1069,7 +1073,7 @@
     },
     "gm_L_1_2": {
       "s1": 2,
-      "s2": ""
+      "s2": 1
     }
   }
 }

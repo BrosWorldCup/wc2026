@@ -518,7 +518,8 @@ function safeWrite(mutate){
   return result;
 }
 
-async function doSafeWrite(mutate){
+async function doSafeWrite(mutate, retries){
+  retries = retries||0;
   if(!GD.groupResults) GD.groupResults={};
   if(!GD.qualActual) GD.qualActual={};
   if(!GD.thirdsActual) GD.thirdsActual=[];
@@ -526,7 +527,31 @@ async function doSafeWrite(mutate){
   if(!GD.predictions) GD.predictions={};
   if(!GD.players) GD.players=[];
   mutate(GD);
-  await ghWrite(GD);
+  try{
+    await ghWrite(GD);
+  } catch(e){
+    // 409 conflict means the file changed on GitHub between our read and write.
+    // Re-fetch the latest version, re-apply the mutation, and retry (up to 3 times).
+    if(e.message&&e.message.indexOf('409')!==-1&&retries<3){
+      var fresh = await ghRead();
+      if(fresh){
+        GD = fresh;
+        // Re-apply safety defaults
+        if(!GD.groupResults) GD.groupResults={};
+        if(!GD.qualActual) GD.qualActual={};
+        if(!GD.thirdsActual) GD.thirdsActual=[];
+        if(!GD.koResults) GD.koResults={};
+        if(!GD.predictions) GD.predictions={};
+        if(!GD.players) GD.players=[];
+        mutate(GD);
+        await ghWrite(GD);
+      } else {
+        throw e;
+      }
+    } else {
+      throw e;
+    }
+  }
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────
@@ -1003,7 +1028,40 @@ function showSummary(){
   });
   thirdsHtml+='</tbody></table></div></div>';
 
-  // ── Cup Winner table ──
+  // ── Knockout R32 table ──
+  var koHtml='';
+  var r32ms=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
+  var anyKoPreds=players.some(function(name){return Object.keys((GD.predictions[name]||{}).ko||{}).length>0;});
+  if(anyKoPreds||true){
+    koHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
+      '<div style="background:#c0392b;padding:.65rem 1rem"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.15rem;color:#fff;letter-spacing:1px">🥊 Round of 32 Picks</h3></div>'+
+      '<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr>'+
+      '<th style="text-align:left;padding-left:.9rem;min-width:160px">Match</th>';
+    players.forEach(function(n){koHtml+='<th>'+n+'</th>';});
+    koHtml+='</tr></thead><tbody>';
+    r32ms.forEach(function(m,mi){
+      var actual=(GD.koResults||{})[m.id]||'';
+      var bg=mi%2===0?'#fff':'#f9f9f7';
+      koHtml+='<tr style="background:'+bg+'">'+
+        '<td style="padding:7px .9rem;font-weight:700;font-size:.78rem;color:#c0392b">'+m.label+
+        '<div style="font-size:.68rem;font-weight:600;color:#555;margin-top:1px">'+(m.teams?m.teams[0]+' vs '+m.teams[1]:'')+'</div>'+
+        (m.date?'<div style="font-size:.63rem;font-weight:400;color:#aaa">'+m.date+'</div>':'')+
+        '</td>';
+      players.forEach(function(name){
+        var pick=((GD.predictions[name]||{}).ko||{})[m.id]||'';
+        var isCorrect=pick&&actual&&pick.toLowerCase()===actual.toLowerCase();
+        var isWrong=pick&&actual&&!isCorrect;
+        var col=isCorrect?'#1a6b3c':isWrong?'#c62828':'var(--gray-dark)';
+        var bg2=isCorrect?'#d4edda':isWrong?'#fce8e8':'transparent';
+        koHtml+='<td style="padding:5px 8px;text-align:center">'+
+          '<div style="font-size:.74rem;font-weight:600;color:'+col+';background:'+bg2+';border-radius:4px;padding:2px 5px">'+(pick||(actual?'—':'?'))+'</div>'+
+          '</td>';
+      });
+      koHtml+='</tr>';
+    });
+    koHtml+='</tbody></table></div></div>';
+  }
+
   var twHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
     '<div style="background:var(--gold);padding:.65rem 1rem"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.15rem;color:#3a2600;letter-spacing:1px">🌍 Tournament Winner Picks</h3></div>'+
     '<div style="overflow-x:auto"><table style="min-width:400px"><thead><tr>'+
@@ -1032,7 +1090,7 @@ function showSummary(){
     '<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.78rem;color:rgba(255,255,255,.6)">'+
     '🟢 Green = correct &nbsp;|&nbsp; 🔴 Red = wrong &nbsp;|&nbsp; Grey = result not yet set'+
     '</div>'+
-    qualHtml+thirdsHtml+twHtml;
+    qualHtml+thirdsHtml+koHtml+twHtml;
 
   showMain(html);
 }

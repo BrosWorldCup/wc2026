@@ -642,11 +642,17 @@ function showHome(){
   el('hsub').textContent='Prediction Game';el('pbadge').style.display='none';
   isAdmin=false;stopRefresh();
   var locked=isLocked();
-  var banner=locked
-    ?'<div style="background:#fff0f0;border:1px solid var(--red);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.8rem;color:var(--red);font-weight:600">🔒 Predictions are locked — the deadline has passed.</div>'
-    :'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">⏰ Predictions lock on <strong>June 17 at 10:00 PM ET</strong></div>';
+  var banner=r32Open()
+    ?'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">🥊 <strong>Group stage predictions are closed.</strong> The Round of 32 is now open — submit your knockout picks before <strong>3:00 PM ET on June 28</strong>!</div>'
+    :(locked
+      ?'<div style="background:#fff0f0;border:1px solid var(--red);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.8rem;color:var(--red);font-weight:600">🔒 Group stage predictions are locked — the deadline has passed.</div>'
+      :'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">⏰ Predictions lock on <strong>June 17 at 10:00 PM ET</strong></div>');
   var btns=GD.players.map(function(p){
-    var name=pName(p);var sub=!!GD.predictions[name];
+    var name=pName(p);
+    var pred=GD.predictions[name];
+    var sub=r32Open()
+      ? !!(pred&&pred.ko&&Object.keys(pred.ko).length>0)
+      : !!pred;
     return '<button class="player-btn" onclick="loginAs(\''+name.replace(/'/g,"\\'")+'\')">'+'<div class="avatar">'+initials(name)+'</div><span>'+name+'</span>'+'<span class="stag '+(sub?'submitted':'pending')+'">'+(sub?'✅ Submitted':'Pending')+'</span></button>';
   }).join('');
   showMain('<div class="home-card">'+
@@ -670,7 +676,7 @@ function loginAs(name){
   else{PP={qual:{},thirds:{},ko:{},tw:''};}
   el('hsub').textContent='Predictions for: '+name;
   el('pbadge').textContent='👤 '+name;el('pbadge').style.display='inline-block';
-  el('pnav').style.display='flex';el('sticky').style.display=isLocked()?'none':'block';
+  el('pnav').style.display='flex';el('sticky').style.display=(isLocked()&&!r32Open())?'none':'block';
   applyNavLock();
   showMain('<div style="padding-bottom:.5rem"><button class="back-btn" onclick="showHome()">← Back</button></div>'+
     '<div id="ppq" class="panel active"></div>'+
@@ -782,6 +788,21 @@ function renderPK(){
   var cont=el('ppk');if(!cont)return;
   if(!r32Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Knockouts Locked</h3><p>Predictions closed at June 28, 3:00 PM ET.</p></div>';return;}
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
+
+  // Progress bar — count filled R32 picks
+  var r32matches=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
+  var r32total=r32matches.length;
+  var r32filled=r32matches.filter(function(m){return PP.ko[m.id];}).length;
+  var r32pct=Math.round(r32filled/r32total*100);
+  var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&Object.keys(GD.predictions[currentPlayer].ko).length>0);
+  var progressHtml='<div class="pintro" style="margin-bottom:.9rem">'+
+    '<h2 style="color:var(--gold)">🥊 Round of 32 Picks</h2>'+
+    '<p>Pick the winner of each match. <strong>3 pts</strong> per correct call.</p>'+
+    '<div class="pbar-wrap"><div class="pbar" style="width:'+r32pct+'%;background:#c0392b"></div></div>'+
+    '<div class="pbar-lbl">'+r32filled+' / '+r32total+' picks made'+(r32filled===r32total?' ✅ Complete!':'')+'</div>'+
+    (alreadySubmitted?'<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 32 predictions have been submitted.</div>':'')+
+    '</div>';
+
   var matches=KO_MATCHES.filter(function(m){return m.round===curPKO;});
   var tabsHtml='<div class="ko-tabs" id="pkotabs">';
   KO_DEF.forEach(function(d){
@@ -799,35 +820,19 @@ function renderPK(){
     var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#1a1a2e;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
     cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+
       matchupTitle+
-      '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
+      '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value;renderPK()">'+
       '<option value="">— Pick winner —</option>';
     var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
     teamList.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
     cardsHtml+='</select></div>';
   });
   cardsHtml+='</div>';
-  cont.innerHTML='<div style="margin-bottom:.9rem;display:flex;align-items:center;gap:8px"><h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🥊 Knockout Predictions</h2><span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">3 pts per winner</span></div>'+tabsHtml+cardsHtml;
+  cont.innerHTML=progressHtml+tabsHtml+cardsHtml;
 }
 
 function setPKO(round,btn){
   curPKO=round;
-  document.querySelectorAll('#pkotabs .ko-tab').forEach(function(b){b.classList.remove('active');});
-  if(btn)btn.classList.add('active');
-  var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
-  var g=el('pkogrid');if(!g)return;
-  var matches=KO_MATCHES.filter(function(m){return m.round===round;});
-  g.innerHTML=matches.map(function(m){
-    var pred=PP.ko[m.id]||'';
-    var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
-    var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#1a1a2e;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
-    var s='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[round]+'">'+round+' · '+m.label+dateStr+'</div>'+
-      matchupTitle+
-      '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value">'+
-      '<option value="">— Pick winner —</option>';
-    var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
-    teamList.forEach(function(t){s+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
-    return s+'</select></div>';
-  }).join('');
+  renderPK();
 }
 
 // ─── PLAYER: CUP WINNER ───────────────────────────────────────────────────
@@ -847,8 +852,26 @@ function renderPW(){
 // ─── PLAYER: SUBMIT ───────────────────────────────────────────────────────
 function renderPS(){
   var cont=el('pps');if(!cont)return;
+  if(r32Open()){
+    // R32 submission page
+    var r32matches=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
+    var r32filled=r32matches.filter(function(m){return PP.ko[m.id];}).length;
+    var r32total=r32matches.length;
+    var allDone=r32filled===r32total;
+    var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&Object.keys(GD.predictions[currentPlayer].ko).length>0);
+    var tokHtml=!ghToken?'<div class="tok-box"><div class="tl">🎫 Game Token</div><p>Enter the token shared by the admin.</p><input type="text" id="tok" placeholder="Paste game token here…"></div>':'';
+    var errHtml=!allDone?'<div class="verr">⚠ Please pick a winner for all '+r32total+' Round of 32 matches ('+r32filled+'/'+r32total+' done).</div>':'';
+    cont.innerHTML='<div class="sub-card">'+
+      '<h3>📤 Submit Round of 32 Picks</h3>'+
+      '<p>Group stage predictions are closed. Submit your <strong>Round of 32</strong> picks before <strong>June 28 at 3:00 PM ET</strong>.</p>'+
+      (alreadySubmitted?'<div style="margin:.75rem 0;padding:.65rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ You have already submitted Round of 32 picks — you can update them below.</div>':'')+
+      errHtml+tokHtml+
+      '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(!allDone?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit Round of 32 Picks</button>'+
+      '<div id="subst" style="margin-top:.75rem;font-size:.82rem;font-weight:600;text-align:center"></div></div>';
+    return;
+  }
   if(isLocked()){
-    cont.innerHTML='<div class="sub-card"><h3>🔒 Predictions Locked</h3><p>The deadline (June 17 at 10:00 PM ET) has passed.</p>'+(GD.predictions[currentPlayer]?'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ Your predictions were submitted.</div>':'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#fff0f0;border-radius:8px;font-size:.85rem;color:var(--red);font-weight:600">⚠️ No predictions were saved before the deadline.</div>')+'</div>';
+    cont.innerHTML='<div class="sub-card"><h3>🔒 Group Stage Predictions Locked</h3><p>The group stage deadline (June 17 at 10:00 PM ET) has passed.</p>'+(GD.predictions[currentPlayer]?'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ Your predictions were submitted.</div>':'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#fff0f0;border-radius:8px;font-size:.85rem;color:var(--red);font-weight:600">⚠️ No predictions were saved before the deadline.</div>')+'</div>';
     return;
   }
   var errs=validatePP();
@@ -885,7 +908,8 @@ async function doSubmit(){
       fresh.predictions[currentPlayer]={qual:PP.qual,thirds:PP.thirds,ko:PP.ko,tw:PP.tw};
     });
     var cont=el('pps');
-    if(cont)cont.innerHTML='<div class="sub-ok"><div class="ck">✅</div><h3>Predictions Saved!</h3><p>Your picks are live. Come back anytime to update before the deadline.</p><button class="btn btn-green" style="margin-top:1rem" onclick="showHome()">← Back to home</button></div>';
+    var isR32=r32Open();
+    if(cont)cont.innerHTML='<div class="sub-ok"><div class="ck">✅</div><h3>'+(isR32?'Round of 32 Picks Saved!':'Predictions Saved!')+'</h3><p>'+(isR32?'Your knockout picks are live. You can update them before the deadline (June 28, 3:00 PM ET).':'Your picks are live. Come back anytime to update before the deadline.')+'</p><button class="btn btn-green" style="margin-top:1rem" onclick="showHome()">← Back to home</button></div>';
     el('sticky').style.display='none';
   }catch(e){
     if(st){st.style.color='var(--red)';st.textContent='❌ '+e.message;}

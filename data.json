@@ -53,6 +53,10 @@
     "J": [
       "Argentina",
       "Austria"
+    ],
+    "K": [
+      "Colombia",
+      "Portugal"
     ]
   },
   "thirdsActual": [],
@@ -1057,7 +1061,7 @@
     },
     "gm_K_1_2": {
       "s1": 1,
-      "s2": ""
+      "s2": 3
     }
   }
 }

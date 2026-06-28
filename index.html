@@ -421,7 +421,7 @@ GK.forEach(function(g){
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 var GD = {players:[],unlocked:false,qualActual:{},thirdsActual:[],koResults:{},twActual:'',predictions:{},groupResults:{}};
-var ghToken = '';
+var ghToken = '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';
 var ghSha = '';
 var currentPlayer = null;
 var isAdmin = false;
@@ -859,7 +859,7 @@ function renderPS(){
     var r32total=r32matches.length;
     var allDone=r32filled===r32total;
     var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&Object.keys(GD.predictions[currentPlayer].ko).length>0);
-    var tokHtml=!ghToken?'<div class="tok-box"><div class="tl">🎫 Game Token</div><p>Enter the token shared by the admin.</p><input type="text" id="tok" placeholder="Paste game token here…"></div>':'';
+    var tokHtml='';
     var errHtml=!allDone?'<div class="verr">⚠ Please pick a winner for all '+r32total+' Round of 32 matches ('+r32filled+'/'+r32total+' done).</div>':'';
     cont.innerHTML='<div class="sub-card">'+
       '<h3>📤 Submit Round of 32 Picks</h3>'+
@@ -876,7 +876,7 @@ function renderPS(){
   }
   var errs=validatePP();
   var errHtml=errs.length?'<div class="verr">⚠ Please fix these before submitting:<ul>'+errs.map(function(e){return '<li>'+e+'</li>';}).join('')+'</ul></div>':'';
-  var tokHtml=!ghToken?'<div class="tok-box"><div class="tl">🎫 Game Token</div><p>Enter the token shared by the admin.</p><input type="text" id="tok" placeholder="Paste game token here…"></div>':'';
+  var tokHtml='';
   cont.innerHTML='<div class="sub-card"><h3>📤 Submit Your Predictions</h3>'+
     '<p>Save your predictions. You can update them until <strong>June 17 at 10:00 PM ET</strong>.</p>'+
     errHtml+tokHtml+

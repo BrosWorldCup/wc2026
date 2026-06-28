@@ -350,7 +350,7 @@ const GH_REPO  = 'wc2026';
 const DATA_FILE = 'data.json';
 const ADMIN_PASSWORD = 'WorldCup26';
 const DEADLINE = new Date('2026-06-18T02:00:00Z'); // June 17 22:00 ET
-const R32_UNLOCK = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET
+const R32_LOCK = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET — R32 locks at this time
 const R16_UNLOCK = new Date('2026-07-04T17:00:00Z'); // July 4 13:00 ET
 
 // ─── STATIC DATA ──────────────────────────────────────────────────────────
@@ -532,7 +532,7 @@ function score(name){
 
 // ─── TIME ─────────────────────────────────────────────────────────────────
 function isLocked(){return new Date()>=DEADLINE;}
-function r32Open(){return new Date()>=R32_UNLOCK;}
+function r32Open(){return new Date()<R32_LOCK;}
 function r16Open(){return new Date()>=R16_UNLOCK;}
 function koOpen(round){
   if(round==='Round of 32') return r32Open();
@@ -757,7 +757,7 @@ function setPT(g,val){
 // ─── PLAYER: KNOCKOUTS ────────────────────────────────────────────────────
 function renderPK(){
   var cont=el('ppk');if(!cont)return;
-  if(!r32Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Knockouts Locked</h3><p>Opens June 28 at 3:00 PM ET.</p></div>';return;}
+  if(!r32Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Knockouts Locked</h3><p>Predictions closed at June 28, 3:00 PM ET.</p></div>';return;}
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
   var matches=KO_MATCHES.filter(function(m){return m.round===curPKO;});
   var tabsHtml='<div class="ko-tabs" id="pkotabs">';
@@ -1034,7 +1034,7 @@ function renderASetup(){
     '<button class="btn btn-red" style="font-size:.75rem;padding:.4rem .9rem" onclick="resetGhToken();renderASetup()">🔑 '+(ghToken?'Re-enter':'Enter')+' token</button>'+
     '</div>'+
     '<div style="margin-top:1rem;padding:.75rem 1rem;background:#f0faf4;border:1px solid var(--green);border-radius:10px;font-size:.82rem;color:#1a6b3c">'+
-    '<strong>⏰ Auto-unlock schedule:</strong><br>🔒 Predictions lock: June 17 at 10:00 PM ET<br>🥊 Round of 32 opens: June 28 at 3:00 PM ET<br>🥊 Round of 16+: July 4 at 1:00 PM ET</div>'+
+    '<strong>⏰ Auto-unlock schedule:</strong><br>🔒 Predictions lock: June 17 at 10:00 PM ET<br>🥊 Round of 32: Open now — locks June 28 at 3:00 PM ET<br>🥊 Round of 16+: July 4 at 1:00 PM ET</div>'+
     '<div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #e8e8e4">'+
     '<h3 style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:var(--green);margin-bottom:.5rem">📤 Player Links</h3>'+
     '<p style="font-size:.78rem;color:var(--gray-mid);margin-bottom:.75rem">Each player adds their hash to the end of the app URL.<br>Example: <code>https://mohamadndine.github.io/wc2026/#player=Rami</code></p>'+

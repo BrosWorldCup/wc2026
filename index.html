@@ -589,7 +589,7 @@ function sel(opts,val,onch,cls){
 // ─── INIT ─────────────────────────────────────────────────────────────────
 async function init(){
   showLoading('Loading game data…');
-  ghToken = localStorage.getItem('gh_token')||'';
+  if(!ghToken) ghToken = localStorage.getItem('gh_token')||'';
   if(GH_OWNER==='YOUR_GITHUB_USERNAME'){
     showMain('<div class="card" style="max-width:480px;margin:0 auto;text-align:center"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--green);margin-bottom:.5rem">Setup Required</h3><p style="font-size:.85rem;color:var(--gray-mid)">Fill in GH_OWNER, GH_REPO and ADMIN_PASSWORD in the script.</p></div>');
     return;
@@ -1053,10 +1053,14 @@ function doAdminLogin(){
   var pw=el('apw').value;
   if(pw===ADMIN_PASSWORD){
     isAdmin=true;
-    var hadToken=!!ghToken;
+    // If data failed to load, always ask for a fresh token
+    if(!GD.players.length){
+      var tok=prompt('Enter your GitHub Personal Access Token:');
+      if(!tok){el('lerr').textContent='❌ Token required to load data.';isAdmin=false;return;}
+      ghToken=tok.trim();localStorage.setItem('gh_token',ghToken);
+      init();return;
+    }
     if(!ghToken){var tok=prompt('Enter your GitHub Personal Access Token:');if(!tok)return;ghToken=tok.trim();localStorage.setItem('gh_token',ghToken);}
-    // If data failed to load earlier, retry now that we have a token
-    if(!GD.players.length){init();return;}
     location.hash='admin';
     el('hsub').textContent='Admin Panel';el('pbadge').style.display='none';
     el('anav').style.display='flex';el('pnav').style.display='none';

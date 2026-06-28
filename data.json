@@ -607,7 +607,24 @@
         "G": "Iran",
         "H": "Saudi Arabia"
       },
-      "ko": {},
+      "ko": {
+        "ko_Round_of_32_1": "Canada",
+        "ko_Round_of_32_2": "Brazil",
+        "ko_Round_of_32_3": "Germany",
+        "ko_Round_of_32_4": "Morocco",
+        "ko_Round_of_32_5": "Norway",
+        "ko_Round_of_32_6": "France",
+        "ko_Round_of_32_7": "Mexico",
+        "ko_Round_of_32_8": "England",
+        "ko_Round_of_32_9": "Belgium",
+        "ko_Round_of_32_10": "Bosnia-Herzegovina",
+        "ko_Round_of_32_11": "Spain",
+        "ko_Round_of_32_12": "Croatia",
+        "ko_Round_of_32_13": "Algeria",
+        "ko_Round_of_32_14": "Egypt",
+        "ko_Round_of_32_15": "Argentina",
+        "ko_Round_of_32_16": "Ghana"
+      },
       "tw": ""
     },
     "Belal": {

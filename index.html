@@ -421,7 +421,7 @@ GK.forEach(function(g){
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 var GD = {players:[],unlocked:false,qualActual:{},thirdsActual:[],koResults:{},twActual:'',predictions:{},groupResults:{}};
-var ghToken = '';
+var ghToken = localStorage.getItem('gh_token')||'';
 var ghSha = '';
 var currentPlayer = null;
 var isAdmin = false;

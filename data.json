@@ -49,6 +49,10 @@
     "I": [
       "France",
       "Norway"
+    ],
+    "J": [
+      "Argentina",
+      "Austria"
     ]
   },
   "thirdsActual": [],
@@ -1045,7 +1049,7 @@
     },
     "gm_J_1_2": {
       "s1": 3,
-      "s2": ""
+      "s2": 3
     }
   }
 }

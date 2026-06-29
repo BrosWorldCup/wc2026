@@ -350,8 +350,9 @@ const GH_REPO  = 'wc2026';
 const DATA_FILE = 'data.json';
 const ADMIN_PASSWORD = 'WorldCup26';
 const DEADLINE = new Date('2026-06-18T02:00:00Z'); // June 17 22:00 ET
-const R32_LOCK = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET — R32 locks at this time
-const R16_UNLOCK = new Date('2026-07-04T17:00:00Z'); // July 4 13:00 ET
+const R32_LOCK   = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET — R32 locks
+const R16_UNLOCK = new Date('2026-07-03T01:00:00Z'); // July 3  21:00 ET — R16 opens
+const R16_LOCK   = new Date('2026-07-04T17:00:00Z'); // July 4  13:00 ET — R16 locks
 
 // ─── STATIC DATA ──────────────────────────────────────────────────────────
 const GROUPS = {
@@ -580,12 +581,22 @@ function score(name){
 
 // ─── TIME ─────────────────────────────────────────────────────────────────
 function isLocked(){return new Date()>=DEADLINE;}
-function r32Open(){return new Date()<R32_LOCK;}
-function r16Open(){return new Date()>=R16_UNLOCK;}
-function koOpen(round){
+function r32Open(){return new Date()<R32_LOCK;}   // predictions still editable
+function r32Past(){return new Date()>=R32_LOCK;}   // deadline passed — view only
+function r16Open(){return new Date()>=R16_UNLOCK&&new Date()<R16_LOCK;}
+function r16Past(){return new Date()>=R16_LOCK;}
+function koEditable(round){
   if(round==='Round of 32') return r32Open();
-  return r16Open();
+  if(round==='Round of 16') return r16Open();
+  return false;
 }
+function koVisible(round){
+  // always visible once R32 has opened (past deadline = read-only)
+  if(round==='Round of 32') return true;
+  if(round==='Round of 16') return r16Open()||r16Past();
+  return false;
+}
+function koOpen(round){ return koEditable(round); } // legacy alias
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 function el(id){return document.getElementById(id);}
@@ -720,14 +731,18 @@ function loginAs(name){
 
 function applyNavLock(){
   var pkb=el('npk'),pwb=el('npw');
-  if(r32Open()){pkb.classList.remove('locked');}else{pkb.classList.add('locked');}
-  if(r16Open()){pwb.classList.remove('locked');}else{pwb.classList.add('locked');}
+  // Knockout tab: always accessible (read-only after R32 deadline)
+  if(pkb){pkb.classList.remove('locked');pkb.removeAttribute('disabled');}
+  // R16+ tab: only accessible once R16 opens or has passed
+  if(pwb){
+    if(r16Open()||r16Past()){pwb.classList.remove('locked');pwb.removeAttribute('disabled');}
+    else{pwb.classList.add('locked');}
+  }
 }
 
 // ─── PLAYER TABS ──────────────────────────────────────────────────────────
 function showPTab(tab,btn){
-  if(tab==='ppk'&&!r32Open()) return;
-  if(tab==='ppw'&&!r16Open()) return;
+  if(tab==='ppw'&&!r16Open()&&!r16Past()) return;
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('#pnav button').forEach(function(b){b.classList.remove('active');});
   var e=el(tab);if(!e)return;
@@ -817,45 +832,70 @@ function setPT(g,val){
 // ─── PLAYER: KNOCKOUTS ────────────────────────────────────────────────────
 function renderPK(){
   var cont=el('ppk');if(!cont)return;
-  if(!r32Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Knockouts Locked</h3><p>Predictions closed at June 28, 3:00 PM ET.</p></div>';return;}
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
-
-  // Progress bar — count filled R32 picks
+  var editable=koEditable(curPKO);
   var r32matches=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
   var r32total=r32matches.length;
   var r32filled=r32matches.filter(function(m){return PP.ko[m.id];}).length;
   var r32pct=Math.round(r32filled/r32total*100);
   var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&Object.keys(GD.predictions[currentPlayer].ko).length>0);
-  var progressHtml='<div class="pintro" style="margin-bottom:.9rem">'+
-    '<h2 style="color:var(--gold)">🥊 Round of 32 Picks</h2>'+
-    '<p>Pick the winner of each match. <strong>3 pts</strong> per correct call.</p>'+
-    '<div class="pbar-wrap"><div class="pbar" style="width:'+r32pct+'%;background:#c0392b"></div></div>'+
-    '<div class="pbar-lbl">'+r32filled+' / '+r32total+' picks made'+(r32filled===r32total?' ✅ Complete!':'')+'</div>'+
-    (alreadySubmitted?'<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 32 predictions have been submitted.</div>':'')+
-    '</div>';
 
-  var matches=KO_MATCHES.filter(function(m){return m.round===curPKO;});
+  // Header / progress bar
+  var isR32=(curPKO==='Round of 32');
+  var progressHtml='<div class="pintro" style="margin-bottom:.9rem">';
+  if(isR32){
+    progressHtml+='<h2 style="color:var(--gold)">🥊 Round of 32 Picks</h2>';
+    if(editable){
+      progressHtml+='<p>Pick the winner of each match. <strong>3 pts</strong> per correct call.</p>'+
+        '<div class="pbar-wrap"><div class="pbar" style="width:'+r32pct+'%;background:#c0392b"></div></div>'+
+        '<div class="pbar-lbl">'+r32filled+' / '+r32total+' picks made'+(r32filled===r32total?' ✅ Complete!':'')+'</div>';
+      if(alreadySubmitted) progressHtml+='<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 32 predictions have been submitted.</div>';
+    } else {
+      progressHtml+='<div style="padding:.5rem .9rem;background:#fff8e7;border:1px solid var(--gold);border-radius:8px;font-size:.8rem;color:#856404">🔒 Predictions closed — viewing your picks (read-only)</div>';
+    }
+  } else {
+    progressHtml+='<h2 style="color:var(--gold)">🥊 '+curPKO+' Picks</h2>';
+    if(!editable) progressHtml+='<div style="padding:.5rem .9rem;background:#fff8e7;border:1px solid var(--gold);border-radius:8px;font-size:.8rem;color:#856404">🔒 Predictions closed — viewing your picks (read-only)</div>';
+  }
+  progressHtml+='</div>';
+
+  // Round tabs
   var tabsHtml='<div class="ko-tabs" id="pkotabs">';
   KO_DEF.forEach(function(d){
-    var open=koOpen(d.k);
+    var visible=koVisible(d.k);
     var act=d.k===curPKO?' active':'';
     var label=d.k==='Final'?'⭐ Final':d.k==='3rd Place'?'3rd':d.k;
-    if(!open) tabsHtml+='<button class="ko-tab '+d.tab+'" disabled style="opacity:.35;cursor:not-allowed">'+label+' 🔒</button>';
+    if(!visible) tabsHtml+='<button class="ko-tab '+d.tab+'" disabled style="opacity:.35;cursor:not-allowed">'+label+' 🔒</button>';
     else tabsHtml+='<button class="ko-tab '+d.tab+act+'" onclick="setPKO(\''+d.k+'\',this)">'+label+'</button>';
   });
   tabsHtml+='</div>';
+
+  // Match cards
+  var matches=KO_MATCHES.filter(function(m){return m.round===curPKO;});
   var cardsHtml='<div class="mgrid" id="pkogrid">';
   matches.forEach(function(m){
     var pred=PP.ko[m.id]||'';
+    var actual=(GD.koResults||{})[m.id]||'';
+    var isCorrect=pred&&actual&&pred.toLowerCase()===actual.toLowerCase();
+    var isWrong=pred&&actual&&!isCorrect;
     var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
     var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#1a1a2e;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
-    cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+
-      matchupTitle+
-      '<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value;renderPK()">'+
-      '<option value="">— Pick winner —</option>';
-    var teamList = (m.teams && m.teams.length) ? m.teams : ALL_TEAMS;
-    teamList.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
-    cardsHtml+='</select></div>';
+    cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+matchupTitle;
+    if(editable){
+      cardsHtml+='<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value;renderPK()">'+
+        '<option value="">— Pick winner —</option>';
+      var teamList=(m.teams&&m.teams.length)?m.teams:ALL_TEAMS;
+      teamList.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
+      cardsHtml+='</select>';
+    } else {
+      // Read-only display
+      var col=isCorrect?'#1a6b3c':isWrong?'#c62828':'#555';
+      var bg2=isCorrect?'#d4edda':isWrong?'#fce8e8':'#f0f0f0';
+      var icon=isCorrect?'✅ ':isWrong?'❌ ':'';
+      cardsHtml+='<div style="margin-top:6px;padding:6px 10px;background:'+bg2+';border-radius:6px;font-size:.85rem;font-weight:700;color:'+col+'">'+(pred?icon+pred:'— No pick —')+'</div>';
+      if(actual) cardsHtml+='<div style="font-size:.7rem;color:#888;margin-top:3px">Actual: <strong>'+actual+'</strong></div>';
+    }
+    cardsHtml+='</div>';
   });
   cardsHtml+='</div>';
   cont.innerHTML=progressHtml+tabsHtml+cardsHtml;
@@ -1028,23 +1068,25 @@ function showSummary(){
   });
   thirdsHtml+='</tbody></table></div></div>';
 
-  // ── Knockout R32 table ──
-  var koHtml='';
-  var r32ms=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
-  var anyKoPreds=players.some(function(name){return Object.keys((GD.predictions[name]||{}).ko||{}).length>0;});
-  if(anyKoPreds||true){
-    koHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
-      '<div style="background:#c0392b;padding:.65rem 1rem"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.15rem;color:#fff;letter-spacing:1px">🥊 Round of 32 Picks</h3></div>'+
-      '<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr>'+
+  // ── Knockout predictions — tabbed by round ──
+  var koRounds=[
+    {key:'Round of 32',   color:'#c0392b', label:'🥊 R32'},
+    {key:'Round of 16',   color:'#e67e22', label:'⚔️ R16'},
+    {key:'Quarter-finals',color:'#8b1a1a', label:'🏆 QF'},
+    {key:'Semi-finals',   color:'#5b21b6', label:'🔥 SF'},
+  ];
+  function buildKoRoundTable(roundKey, color){
+    var ms=KO_MATCHES.filter(function(m){return m.round===roundKey;});
+    var t='<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr>'+
       '<th style="text-align:left;padding-left:.9rem;min-width:160px">Match</th>';
-    players.forEach(function(n){koHtml+='<th>'+n+'</th>';});
-    koHtml+='</tr></thead><tbody>';
-    r32ms.forEach(function(m,mi){
+    players.forEach(function(n){t+='<th>'+n+'</th>';});
+    t+='</tr></thead><tbody>';
+    ms.forEach(function(m,mi){
       var actual=(GD.koResults||{})[m.id]||'';
       var bg=mi%2===0?'#fff':'#f9f9f7';
-      koHtml+='<tr style="background:'+bg+'">'+
-        '<td style="padding:7px .9rem;font-weight:700;font-size:.78rem;color:#c0392b">'+m.label+
-        '<div style="font-size:.68rem;font-weight:600;color:#555;margin-top:1px">'+(m.teams?m.teams[0]+' vs '+m.teams[1]:'')+'</div>'+
+      t+='<tr style="background:'+bg+'">'+
+        '<td style="padding:7px .9rem;font-weight:700;font-size:.78rem;color:'+color+'">'+m.label+
+        (m.teams?'<div style="font-size:.68rem;font-weight:600;color:#555;margin-top:1px">'+m.teams[0]+' vs '+m.teams[1]+'</div>':'')+
         (m.date?'<div style="font-size:.63rem;font-weight:400;color:#aaa">'+m.date+'</div>':'')+
         '</td>';
       players.forEach(function(name){
@@ -1053,14 +1095,59 @@ function showSummary(){
         var isWrong=pick&&actual&&!isCorrect;
         var col=isCorrect?'#1a6b3c':isWrong?'#c62828':'var(--gray-dark)';
         var bg2=isCorrect?'#d4edda':isWrong?'#fce8e8':'transparent';
-        koHtml+='<td style="padding:5px 8px;text-align:center">'+
-          '<div style="font-size:.74rem;font-weight:600;color:'+col+';background:'+bg2+';border-radius:4px;padding:2px 5px">'+(pick||(actual?'—':'?'))+'</div>'+
-          '</td>';
+        t+='<td style="padding:5px 8px;text-align:center">'+
+          '<div style="font-size:.74rem;font-weight:600;color:'+col+';background:'+bg2+';border-radius:4px;padding:2px 5px">'+(pick||(actual?'—':'?'))+'</div></td>';
       });
-      koHtml+='</tr>';
+      t+='</tr>';
     });
-    koHtml+='</tbody></table></div></div>';
+    t+='</tbody></table></div>';
+    return t;
   }
+  var koTabsId='ko-sum-tabs';
+  var koContentId='ko-sum-content';
+  var koHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
+    '<div style="background:#1a1a2e;padding:.65rem 1rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">'+
+    '<span style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#fff;letter-spacing:1px;margin-right:.5rem">🥊 Knockout Picks</span>';
+  koRounds.forEach(function(r,i){
+    koHtml+='<button id="kosumtab_'+i+'" onclick="switchKoSumTab('+i+')" style="border:none;border-radius:20px;padding:3px 12px;font-size:.75rem;font-weight:700;cursor:pointer;background:'+(i===0?r.color:'rgba(255,255,255,.15)')+';color:#fff">'+r.label+'</button>';
+  });
+  koHtml+='</div><div id="'+koContentId+'">';
+  koHtml+=buildKoRoundTable(koRounds[0].key, koRounds[0].color);
+  koHtml+='</div></div>';
+  // Inline script to handle tab switching
+  koHtml+='<script>var _koRounds='+JSON.stringify(koRounds)+';function switchKoSumTab(i){'+
+    'var c=document.getElementById("'+koContentId+'");'+
+    'var rounds='+JSON.stringify(koRounds.map(function(r){return r.key;}))+';'+
+    'var colors='+JSON.stringify(koRounds.map(function(r){return r.color;}))+';'+
+    'var players='+JSON.stringify(players)+';'+
+    'var koResults='+JSON.stringify(GD.koResults||{})+';'+
+    'var preds='+JSON.stringify(GD.predictions)+';'+
+    'var ms='+JSON.stringify(KO_MATCHES)+'.filter(function(m){return m.round===rounds[i];});'+
+    'var t=\'<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr><th style="text-align:left;padding-left:.9rem;min-width:160px">Match</th>\';'+
+    'players.forEach(function(n){t+=\'<th>\'+n+\'</th>\';});'+
+    't+=\'</tr></thead><tbody>\';'+
+    'ms.forEach(function(m,mi){'+
+      'var actual=(koResults[m.id])||"";'+
+      'var bg=mi%2===0?"#fff":"#f9f9f7";'+
+      't+=\'<tr style="background:\'+bg+\'">\'+'+
+        '\'<td style="padding:7px .9rem;font-weight:700;font-size:.78rem;color:\'+colors[i]+\'">\'+m.label+'+
+        '(m.teams?\'<div style="font-size:.68rem;font-weight:600;color:#555;margin-top:1px">\'+m.teams[0]+\' vs \'+m.teams[1]+\'</div>\':"")+'+
+        '(m.date?\'<div style="font-size:.63rem;color:#aaa">\'+m.date+\'</div>\':"")+'+
+        '"</td>";'+
+      'players.forEach(function(name){'+
+        'var pick=((preds[name]||{}).ko||{})[m.id]||"";'+
+        'var ok=pick&&actual&&pick.toLowerCase()===actual.toLowerCase();'+
+        'var bad=pick&&actual&&!ok;'+
+        'var col=ok?"#1a6b3c":bad?"#c62828":"var(--gray-dark)";'+
+        'var bg2=ok?"#d4edda":bad?"#fce8e8":"transparent";'+
+        't+=\'<td style="padding:5px 8px;text-align:center"><div style="font-size:.74rem;font-weight:600;color:\'+col+\';background:\'+bg2+\';border-radius:4px;padding:2px 5px">\'+( pick||(actual?"—":"?"))+\'</div></td>\';'+
+      '});'+
+      't+="</tr>";'+
+    '});'+
+    't+="</tbody></table></div>";'+
+    'c.innerHTML=t;'+
+    'document.querySelectorAll("[id^=kosumtab_]").forEach(function(b,j){b.style.background=j===i?colors[i]:"rgba(255,255,255,.15)";});'+
+  '}<\/script>';
 
   var twHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
     '<div style="background:var(--gold);padding:.65rem 1rem"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.15rem;color:#3a2600;letter-spacing:1px">🌍 Tournament Winner Picks</h3></div>'+

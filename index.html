@@ -227,7 +227,18 @@ tbody td:nth-child(2){text-align:left;}
 .stand-table tbody tr.tz td:first-child{border-left:3px solid var(--gold);}
 .stand-table tbody tr.oz td:first-child{border-left:3px solid transparent;}
 .stand-pts{font-weight:700;color:var(--green);}
-.stand-legend{display:flex;gap:14px;flex-wrap:wrap;padding:.6rem 1rem;font-size:.68rem;color:var(--gray-mid);border-top:1px solid #f0efe8;}
+.bracket-round{margin-bottom:1.5rem;}
+.bracket-round-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:1px;color:#fff;padding:.4rem .9rem;border-radius:8px 8px 0 0;margin-bottom:0;}
+.bracket-matches{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;padding:.75rem;}
+.bracket-card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
+.bracket-card-hdr{font-size:.7rem;font-weight:700;padding:4px 10px;color:#fff;opacity:.9;}
+.bracket-team{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;font-size:.85rem;font-weight:600;border-bottom:1px solid #f0efe8;}
+.bracket-team:last-child{border-bottom:none;}
+.bracket-team.winner{background:#d4edda;color:#1a6b3c;}
+.bracket-team.loser{color:#aaa;}
+.bracket-team.tbd{color:#bbb;font-style:italic;}
+.bracket-score{font-size:.8rem;font-weight:700;color:#555;}
+#standings-page .stbar h2{font-size:1.1rem;}
 .stand-legend span{display:inline-flex;align-items:center;gap:4px;}
 .stand-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
 .stand-note{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.78rem;color:rgba(255,255,255,.6);}
@@ -335,12 +346,21 @@ tbody td:nth-child(2){text-align:left;}
 <div id="standings-page">
   <button class="back-btn" onclick="showWelcome()">← Back to Home</button>
   <div class="stbar">
-    <h2>📊 Group Standings</h2>
+    <h2 id="standings-title">📊 Group Standings</h2>
     <button class="rbtn" onclick="fetchStandings()">🔄 Refresh</button>
     <span class="rlbl" id="standlbl"></span>
   </div>
-  <div class="stand-note">Standings are calculated from match results entered by the admin. A group's top 2 teams (✅) are automatically confirmed as qualified once all 6 matches in that group are complete — player points update instantly.</div>
-  <div class="stand-grid" id="standgrid"><div class="loading"><div class="spinner"></div><p>Loading standings…</p></div></div>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
+    <button id="stand-tab-groups" onclick="showStandTab('groups')" style="border:none;border-radius:20px;padding:5px 16px;font-size:.8rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">📊 Group Stage</button>
+    <button id="stand-tab-bracket" onclick="showStandTab('bracket')" style="border:none;border-radius:20px;padding:5px 16px;font-size:.8rem;font-weight:700;cursor:pointer;background:rgba(0,0,0,.1);color:#555">🏆 Knockout Bracket</button>
+  </div>
+  <div id="stand-panel-groups">
+    <div class="stand-note">Standings are calculated from match results entered by the admin. A group's top 2 teams (✅) are automatically confirmed as qualified once all 6 matches in that group are complete — player points update instantly.</div>
+    <div class="stand-grid" id="standgrid"><div class="loading"><div class="spinner"></div><p>Loading standings…</p></div></div>
+  </div>
+  <div id="stand-panel-bracket" style="display:none">
+    <div id="bracket-grid"></div>
+  </div>
 </div>
 <div id="sticky"><button onclick="goSubmit()">📤 Submit Predictions</button></div>
 <script>
@@ -1047,7 +1067,7 @@ function showLB(){
   var rows=GD.players.map(function(p){var n=pName(p);return Object.assign({name:n},score(n));}).sort(function(a,b){return b.total-a.total;});
   var html='<button class="back-btn" onclick="showHome()">← Back</button>'+
     '<div class="lb-hdr"><h2>🏆 Leaderboard</h2><p>Live standings</p>'+
-    '<div class="chips"><span class="chip">Qualifier: <span>3 pts</span></span><span class="chip">3rd: <span>1 pt</span></span><span class="chip">KO: <span>3 pts</span></span><span class="chip">Cup: <span>10 pts</span></span></div></div>'+
+    '<div class="chips"><span class="chip">Qualifier: <span>3 pts</span></span><span class="chip">3rd Place: <span>1 pt</span></span><span class="chip">R32: <span>3 pts</span></span><span class="chip">R16: <span>5 pts</span></span><span class="chip">QF: <span>7 pts</span></span><span class="chip">SF: <span>10 pts</span></span><span class="chip">Final / Cup Winner: <span>17 pts</span></span></div></div>'+
     '<div class="lb-wrap"><table><thead><tr><th style="width:36px">#</th><th>Player</th><th>Qual</th><th>3rds</th><th>KO</th><th>Cup</th><th>Total</th></tr></thead><tbody>';
   rows.forEach(function(p,r){
     var cls=r===0?'r1':r===1?'r2':r===2?'r3':'ro';
@@ -1121,13 +1141,14 @@ function showSummary(){
 
   // ── Knockout predictions — tabbed by round ──
   var koRounds=[
-    {key:'Round of 32',   color:'#c0392b', label:'🥊 R32'},
-    {key:'Round of 16',   color:'#e67e22', label:'⚔️ R16'},
-    {key:'Quarter-finals',color:'#8b1a1a', label:'🏆 QF'},
-    {key:'Semi-finals',   color:'#5b21b6', label:'🔥 SF'},
+    {key:'Round of 32',    color:'#c0392b', label:'🥊 R32'},
+    {key:'Round of 16',    color:'#e67e22', label:'⚔️ R16'},
+    {key:'Quarter-finals', color:'#8b1a1a', label:'🏆 QF'},
+    {key:'Semi-finals',    color:'#5b21b6', label:'🔥 SF'},
   ];
   function buildKoRoundTable(roundKey, color){
     var ms=KO_MATCHES.filter(function(m){return m.round===roundKey;});
+    if(!ms.length) return '<p style="padding:1rem;color:#aaa;font-size:.85rem">No matches scheduled for this round yet.</p>';
     var t='<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr>'+
       '<th style="text-align:left;padding-left:.9rem;min-width:160px">Match</th>';
     players.forEach(function(n){t+='<th>'+n+'</th>';});
@@ -1154,51 +1175,20 @@ function showSummary(){
     t+='</tbody></table></div>';
     return t;
   }
-  var koTabsId='ko-sum-tabs';
-  var koContentId='ko-sum-content';
   var koHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
     '<div style="background:#1a1a2e;padding:.65rem 1rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">'+
     '<span style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#fff;letter-spacing:1px;margin-right:.5rem">🥊 Knockout Picks</span>';
   koRounds.forEach(function(r,i){
-    koHtml+='<button id="kosumtab_'+i+'" onclick="switchKoSumTab('+i+')" style="border:none;border-radius:20px;padding:3px 12px;font-size:.75rem;font-weight:700;cursor:pointer;background:'+(i===0?r.color:'rgba(255,255,255,.15)')+';color:#fff">'+r.label+'</button>';
+    koHtml+='<button id="kosumtab_'+i+'" onclick="showKoSumTab('+i+')" style="border:none;border-radius:20px;padding:3px 12px;font-size:.75rem;font-weight:700;cursor:pointer;background:'+(i===0?r.color:'rgba(255,255,255,.15)')+';color:#fff;transition:background .2s">'+r.label+'</button>';
   });
-  koHtml+='</div><div id="'+koContentId+'">';
-  koHtml+=buildKoRoundTable(koRounds[0].key, koRounds[0].color);
-  koHtml+='</div></div>';
-  // Inline script to handle tab switching
-  koHtml+='<script>var _koRounds='+JSON.stringify(koRounds)+';function switchKoSumTab(i){'+
-    'var c=document.getElementById("'+koContentId+'");'+
-    'var rounds='+JSON.stringify(koRounds.map(function(r){return r.key;}))+';'+
-    'var colors='+JSON.stringify(koRounds.map(function(r){return r.color;}))+';'+
-    'var players='+JSON.stringify(players)+';'+
-    'var koResults='+JSON.stringify(GD.koResults||{})+';'+
-    'var preds='+JSON.stringify(GD.predictions)+';'+
-    'var ms='+JSON.stringify(KO_MATCHES)+'.filter(function(m){return m.round===rounds[i];});'+
-    'var t=\'<div style="overflow-x:auto"><table style="min-width:500px"><thead><tr><th style="text-align:left;padding-left:.9rem;min-width:160px">Match</th>\';'+
-    'players.forEach(function(n){t+=\'<th>\'+n+\'</th>\';});'+
-    't+=\'</tr></thead><tbody>\';'+
-    'ms.forEach(function(m,mi){'+
-      'var actual=(koResults[m.id])||"";'+
-      'var bg=mi%2===0?"#fff":"#f9f9f7";'+
-      't+=\'<tr style="background:\'+bg+\'">\'+'+
-        '\'<td style="padding:7px .9rem;font-weight:700;font-size:.78rem;color:\'+colors[i]+\'">\'+m.label+'+
-        '(m.teams?\'<div style="font-size:.68rem;font-weight:600;color:#555;margin-top:1px">\'+m.teams[0]+\' vs \'+m.teams[1]+\'</div>\':"")+'+
-        '(m.date?\'<div style="font-size:.63rem;color:#aaa">\'+m.date+\'</div>\':"")+'+
-        '"</td>";'+
-      'players.forEach(function(name){'+
-        'var pick=((preds[name]||{}).ko||{})[m.id]||"";'+
-        'var ok=pick&&actual&&pick.toLowerCase()===actual.toLowerCase();'+
-        'var bad=pick&&actual&&!ok;'+
-        'var col=ok?"#1a6b3c":bad?"#c62828":"var(--gray-dark)";'+
-        'var bg2=ok?"#d4edda":bad?"#fce8e8":"transparent";'+
-        't+=\'<td style="padding:5px 8px;text-align:center"><div style="font-size:.74rem;font-weight:600;color:\'+col+\';background:\'+bg2+\';border-radius:4px;padding:2px 5px">\'+( pick||(actual?"—":"?"))+\'</div></td>\';'+
-      '});'+
-      't+="</tr>";'+
-    '});'+
-    't+="</tbody></table></div>";'+
-    'c.innerHTML=t;'+
-    'document.querySelectorAll("[id^=kosumtab_]").forEach(function(b,j){b.style.background=j===i?colors[i]:"rgba(255,255,255,.15)";});'+
-  '}<\/script>';
+  koHtml+='</div>';
+  // Pre-render all tabs as hidden divs — no inline script needed
+  koRounds.forEach(function(r,i){
+    koHtml+='<div id="ko-sum-panel-'+i+'" style="display:'+(i===0?'block':'none')+'">';
+    koHtml+=buildKoRoundTable(r.key, r.color);
+    koHtml+='</div>';
+  });
+  koHtml+='</div>';
 
   var twHtml='<div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.25rem">'+
     '<div style="background:var(--gold);padding:.65rem 1rem"><h3 style="font-family:Bebas Neue,sans-serif;font-size:1.15rem;color:#3a2600;letter-spacing:1px">🌍 Tournament Winner Picks</h3></div>'+
@@ -1904,6 +1894,7 @@ async function fetchStandings(){
   try{
     GD=await ghRead();
     renderStandings();
+    if(el('stand-panel-bracket')&&el('stand-panel-bracket').style.display!=='none') renderBracket();
     if(lbl)lbl.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){
     if(lbl)lbl.textContent='Failed to refresh';
@@ -1941,6 +1932,68 @@ function renderStandings(){
       '</div>';
   });
   grid.innerHTML=html;
+}
+
+function showStandTab(tab){
+  var isGroups=tab==='groups';
+  el('stand-panel-groups').style.display=isGroups?'block':'none';
+  el('stand-panel-bracket').style.display=isGroups?'none':'block';
+  el('stand-tab-groups').style.background=isGroups?'#1a1a2e':'rgba(0,0,0,.1)';
+  el('stand-tab-groups').style.color=isGroups?'#fff':'#555';
+  el('stand-tab-bracket').style.background=isGroups?'rgba(0,0,0,.1)':'#c9a84c';
+  el('stand-tab-bracket').style.color=isGroups?'#555':'#fff';
+  el('standings-title').textContent=isGroups?'📊 Group Standings':'🏆 Knockout Bracket';
+  if(!isGroups) renderBracket();
+}
+
+function renderBracket(){
+  var grid=el('bracket-grid');if(!grid)return;
+  var koResults=GD.koResults||{};
+  var rounds=[
+    {key:'Round of 32',   color:'#c0392b', matches:R32_FIXTURES},
+    {key:'Round of 16',   color:'#e67e22', matches:R16_FIXTURES},
+    {key:'Quarter-finals',color:'#8b1a1a', matches:KO_MATCHES.filter(function(m){return m.round==='Quarter-finals';})},
+    {key:'Semi-finals',   color:'#5b21b6', matches:KO_MATCHES.filter(function(m){return m.round==='Semi-finals';})},
+    {key:'3rd Place',     color:'#555',    matches:KO_MATCHES.filter(function(m){return m.round==='3rd Place';})},
+    {key:'Final',         color:'#c9a84c', matches:KO_MATCHES.filter(function(m){return m.round==='Final';})},
+  ];
+  var html='';
+  rounds.forEach(function(round){
+    if(!round.matches||!round.matches.length) return;
+    html+='<div class="bracket-round">'+
+      '<div class="bracket-round-title" style="background:'+round.color+'">'+round.key+'</div>'+
+      '<div class="bracket-matches">';
+    round.matches.forEach(function(m){
+      var winner=koResults[m.id]||'';
+      var t1=m.teams?m.teams[0]:'TBD';
+      var t2=m.teams?m.teams[1]:'TBD';
+      var t1win=winner&&winner.toLowerCase()===t1.toLowerCase();
+      var t2win=winner&&winner.toLowerCase()===t2.toLowerCase();
+      var t1cls=!winner?'':'winner'; if(winner&&!t1win) t1cls='loser';
+      var t2cls=!winner?'':'winner'; if(winner&&!t2win) t2cls='loser';
+      html+='<div class="bracket-card">'+
+        '<div class="bracket-card-hdr" style="background:'+round.color+'">'+m.label+(m.date?' · '+m.date:'')+'</div>'+
+        '<div class="bracket-team '+t1cls+'">'+
+          '<span>'+(t1||'<span class="tbd">TBD</span>')+'</span>'+
+          (t1win?'<span style="font-size:.8rem">✅</span>':'')+'</div>'+
+        '<div class="bracket-team '+t2cls+'">'+
+          '<span>'+(t2||'<span class="tbd">TBD</span>')+'</span>'+
+          (t2win?'<span style="font-size:.8rem">✅</span>':'')+'</div>'+
+        '</div>';
+    });
+    html+='</div></div>';
+  });
+  grid.innerHTML=html||'<p style="color:#aaa;padding:1rem">No knockout results yet.</p>';
+}
+
+function showKoSumTab(i){
+  var colors=['#c0392b','#e67e22','#8b1a1a','#5b21b6'];
+  for(var j=0;j<4;j++){
+    var p=document.getElementById('ko-sum-panel-'+j);
+    var b=document.getElementById('kosumtab_'+j);
+    if(p) p.style.display=j===i?'block':'none';
+    if(b) b.style.background=j===i?colors[j]:'rgba(255,255,255,.15)';
+  }
 }
 
 // ─── START ────────────────────────────────────────────────────────────────

@@ -461,7 +461,7 @@ var currentPlayer = null;
 var isAdmin = false;
 var PP = {qual:{},thirds:{},ko:{},tw:''};
 var curKO = 'Round of 32';
-var curPKO = 'Round of 32';
+var curPKO = null;
 
 // ─── GITHUB ───────────────────────────────────────────────────────────────
 var API = 'https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+DATA_FILE;
@@ -757,7 +757,7 @@ function showHome(){
 
 // ─── PLAYER LOGIN ─────────────────────────────────────────────────────────
 function loginAs(name){
-  currentPlayer=name;isAdmin=false;
+  currentPlayer=name;isAdmin=false;curPKO=null;
   var saved=GD.predictions[name];
   if(saved){PP.qual=saved.qual||{};PP.thirds=saved.thirds||{};PP.ko=saved.ko||{};PP.tw=saved.tw||'';}
   else{PP={qual:{},thirds:{},ko:{},tw:''};}
@@ -878,7 +878,15 @@ function setPT(g,val){
 function renderPK(){
   var cont=el('ppk');if(!cont)return;
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
-  var editable=koEditable(curPKO);
+
+  // Set default tab to the currently active round — only on first open (curPKO not yet set)
+  if(!curPKO){
+    if(r16Open()) curPKO='Round of 16';
+    else curPKO='Round of 32';
+  }
+
+  var editable=koEditable(curPKO); // compute AFTER curPKO is finalised
+
   var r32matches=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
   var r32total=r32matches.length;
   var r32filled=r32matches.filter(function(m){return PP.ko[m.id];}).length;
@@ -887,8 +895,6 @@ function renderPK(){
   var r16total=r16matches.length;
   var r16filled=r16matches.filter(function(m){return PP.ko[m.id];}).length;
   var r16pct=Math.round(r16filled/r16total*100);
-  var activeRound=r16Open()?'Round of 16':'Round of 32';
-  if(!curPKO||(curPKO==='Round of 32'&&r16Open()&&!r32Open())) curPKO=activeRound;
   var alreadySubmittedR32=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r32matches.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
   var alreadySubmittedR16=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r16matches.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
 
@@ -908,7 +914,7 @@ function renderPK(){
       '<div class="pbar-lbl">'+r32filled+' / '+r32total+' picks made'+(r32filled===r32total?' ✅ Complete!':'')+'</div>';
     if(alreadySubmittedR32) progressHtml+='<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 32 predictions have been submitted.</div>';
   } else {
-    progressHtml+='<h2 style="color:var(--gold)">🥊 '+curPKO+' Picks</h2>'+
+    progressHtml+='<h2 style="color:var(--gold)">'+(isR16?'⚔️ Round of 16':isR32?'🥊 Round of 32':'🥊 '+curPKO)+' Picks</h2>'+
       '<div style="padding:.5rem .9rem;background:#fff8e7;border:1px solid var(--gold);border-radius:8px;font-size:.8rem;color:#856404">🔒 Predictions closed — viewing your picks (read-only)</div>';
   }
   progressHtml+='</div>';

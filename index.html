@@ -372,7 +372,7 @@ const ADMIN_PASSWORD = 'WorldCup26';
 const DEADLINE = new Date('2026-06-18T02:00:00Z'); // June 17 22:00 ET
 const R32_LOCK   = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET — R32 locks
 const R16_UNLOCK = new Date('2026-07-03T01:00:00Z'); // July 3  21:00 ET — R16 opens
-const R16_LOCK   = new Date('2026-07-04T19:00:00Z'); // July 4  15:00 ET — R16 locks
+const R16_LOCK   = new Date('2026-07-04T18:00:00Z'); // July 4  14:00 ET — R16 locks
 
 // ─── STATIC DATA ──────────────────────────────────────────────────────────
 const GROUPS = {
@@ -603,10 +603,11 @@ function score(name){
   Object.values(tP).forEach(function(t){
     if(tA.some(function(a){return a&&t&&a.toLowerCase()===t.toLowerCase();})) thirds++;
   });
+  var KO_PTS={'Round of 32':3,'Round of 16':5,'Quarter-finals':7,'Semi-finals':10,'3rd Place':10,'Final':17};
   KO_MATCHES.forEach(function(m){
     var pred=((p.ko||{})[m.id]);
     var res=GD.koResults[m.id];
-    if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) ko+=3;
+    if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) ko+=(KO_PTS[m.round]||3);
   });
   if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=10;
   return {qual:qual,thirds:thirds,ko:ko,tw:tw,total:qual+thirds+ko+tw};
@@ -1067,22 +1068,155 @@ async function doSubmit(){
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────
-function showLB(){
-  el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
-  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';stopRefresh();
-  var rows=GD.players.map(function(p){var n=pName(p);return Object.assign({name:n},score(n));}).sort(function(a,b){return b.total-a.total;});
-  var html='<button class="back-btn" onclick="showHome()">← Back</button>'+
-    '<div class="lb-hdr"><h2>🏆 Leaderboard</h2><p>Live standings</p>'+
-    '<div class="chips"><span class="chip">Qualifier: <span>3 pts</span></span><span class="chip">3rd Place: <span>1 pt</span></span><span class="chip">R32: <span>3 pts</span></span><span class="chip">R16: <span>5 pts</span></span><span class="chip">QF: <span>7 pts</span></span><span class="chip">SF: <span>10 pts</span></span><span class="chip">Final / Cup Winner: <span>17 pts</span></span></div></div>'+
-    '<div class="lb-wrap"><table><thead><tr><th style="width:36px">#</th><th>Player</th><th>Qual</th><th>3rds</th><th>KO</th><th>Cup</th><th>Total</th></tr></thead><tbody>';
+function scoreByRound(name){
+  var p=GD.predictions[name]||{};
+  var qual=0,thirds=0;
+  GK.forEach(function(g){
+    var actual=GD.qualActual[g]||[];
+    ((p.qual||{})[g]||[]).forEach(function(t){
+      if(actual.some(function(a){return a&&t&&a.toLowerCase()===t.toLowerCase();})) qual+=3;
+    });
+  });
+  var tA=GD.thirdsActual||[];
+  Object.values(p.thirds||{}).forEach(function(t){
+    if(tA.some(function(a){return a&&t&&a.toLowerCase()===t.toLowerCase();})) thirds++;
+  });
+  var KO_PTS={'Round of 32':3,'Round of 16':5,'Quarter-finals':7,'Semi-finals':10,'3rd Place':10,'Final':17};
+  var koByRound={};
+  KO_MATCHES.forEach(function(m){
+    var pred=((p.ko||{})[m.id]);
+    var res=(GD.koResults||{})[m.id];
+    if(!koByRound[m.round]) koByRound[m.round]=0;
+    if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) koByRound[m.round]+=(KO_PTS[m.round]||3);
+  });
+  var tw=0;
+  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=10;
+  return {qual,thirds,koByRound,tw};
+}
+
+function buildLBTable(rows, cols){
+  // cols: array of {key, label, fn(row)} where fn returns the pts for that column
+  var html='<div class="lb-wrap"><table><thead><tr><th style="width:36px">#</th><th>Player</th>';
+  cols.forEach(function(c){html+='<th>'+c.label+'</th>';});
+  html+='<th>Total</th></tr></thead><tbody>';
   rows.forEach(function(p,r){
     var cls=r===0?'r1':r===1?'r2':r===2?'r3':'ro';
     var medal=r===0?'🥇':r===1?'🥈':r===2?'🥉':r+1;
     var tag=hasPreds(p.name)?'<span style="font-size:.6rem;color:var(--green);margin-left:3px">✓</span>':'';
-    html+='<tr><td><span class="rank-badge '+cls+'">'+medal+'</span></td><td class="pname">'+p.name+tag+'</td><td>'+p.qual+'</td><td>'+p.thirds+'</td><td>'+p.ko+'</td><td>'+p.tw+'</td><td class="tpts">'+p.total+'</td></tr>';
+    html+='<tr><td><span class="rank-badge '+cls+'">'+medal+'</span></td><td class="pname">'+p.name+tag+'</td>';
+    var total=0;
+    cols.forEach(function(c){var v=c.fn(p);total+=v;html+='<td>'+v+'</td>';});
+    html+='<td class="tpts">'+total+'</td></tr>';
   });
   html+='</tbody></table></div>';
+  return html;
+}
+
+function showLB(){
+  el('anav').style.display='none';el('pnav').style.display='none';el('sticky').style.display='none';
+  el('scores-page').style.display='none';el('standings-page').style.display='none';el('main').style.display='block';stopRefresh();
+
+  // Pre-compute scores for all players
+  var allData=GD.players.map(function(p){
+    var n=pName(p);
+    var s=scoreByRound(n);
+    return {name:n, qual:s.qual, thirds:s.thirds, koByRound:s.koByRound, tw:s.tw,
+      r32:s.koByRound['Round of 32']||0,
+      r16:s.koByRound['Round of 16']||0,
+      qf:s.koByRound['Quarter-finals']||0,
+      sf:s.koByRound['Semi-finals']||0,
+      fin:s.koByRound['Final']||0,
+      total:(s.qual+s.thirds+Object.values(s.koByRound).reduce(function(a,b){return a+b;},0)+s.tw)
+    };
+  });
+
+  // Define tabs
+  var tabs=[
+    {id:'lb-overall', label:'🏆 Overall', pts:'All rounds combined'},
+    {id:'lb-groups',  label:'📊 Group Stage', pts:'Qual: 3pts · 3rd: 1pt'},
+    {id:'lb-r32',     label:'🥊 Round of 32', pts:'3 pts per correct pick'},
+    {id:'lb-r16',     label:'⚔️ Round of 16', pts:'5 pts per correct pick'},
+    {id:'lb-qf',      label:'🏆 Quarter-finals', pts:'7 pts per correct pick'},
+    {id:'lb-sf',      label:'🔥 Semi-finals', pts:'10 pts per correct pick'},
+    {id:'lb-fin',     label:'⭐ Final', pts:'17 pts per correct pick'},
+  ];
+
+  var html='<button class="back-btn" onclick="showHome()">← Back</button>'+
+    '<div class="lb-hdr"><h2>🏆 Leaderboard</h2><p>Live standings</p>'+
+    '<div class="chips"><span class="chip">Qualifier: <span>3 pts</span></span><span class="chip">3rd Place: <span>1 pt</span></span><span class="chip">R32: <span>3 pts</span></span><span class="chip">R16: <span>5 pts</span></span><span class="chip">QF: <span>7 pts</span></span><span class="chip">SF: <span>10 pts</span></span><span class="chip">Final / Cup Winner: <span>17 pts</span></span></div></div>';
+
+  // Tab buttons
+  html+='<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">';
+  tabs.forEach(function(t,i){
+    html+='<button id="lbtab_'+i+'" onclick="showLBTab('+i+')" style="border:none;border-radius:20px;padding:5px 13px;font-size:.72rem;font-weight:700;cursor:pointer;background:'+(i===0?'#1a1a2e':'rgba(0,0,0,.1)')+';color:'+(i===0?'#fff':'#555')+';white-space:nowrap">'+t.label+'</button>';
+  });
+  html+='</div>';
+
+  // Tab panels
+  function makePanel(id, visible, rows, cols, subtitle){
+    var sorted=[].concat(rows).sort(function(a,b){
+      var ta=cols.reduce(function(s,c){return s+c.fn(a);},0);
+      var tb=cols.reduce(function(s,c){return s+c.fn(b);},0);
+      return tb-ta;
+    });
+    return '<div id="'+id+'" style="display:'+(visible?'block':'none')+'">'+
+      '<div style="font-size:.75rem;color:#888;margin-bottom:.5rem">'+subtitle+'</div>'+
+      buildLBTable(sorted, cols)+'</div>';
+  }
+
+  // Overall
+  html+=makePanel('lb-overall',true,allData,[
+    {label:'Qual',   fn:function(r){return r.qual;}},
+    {label:'3rds',   fn:function(r){return r.thirds;}},
+    {label:'R32',    fn:function(r){return r.r32;}},
+    {label:'R16',    fn:function(r){return r.r16;}},
+    {label:'QF',     fn:function(r){return r.qf;}},
+    {label:'SF',     fn:function(r){return r.sf;}},
+    {label:'Final',  fn:function(r){return r.fin;}},
+  ],'Combined score across all rounds');
+
+  // Group stage
+  html+=makePanel('lb-groups',false,allData,[
+    {label:'Qualifiers (3pts)',fn:function(r){return r.qual;}},
+    {label:'Best 3rds (1pt)', fn:function(r){return r.thirds;}},
+  ],'Group stage only — Qual: 3pts each · Best 3rd: 1pt each');
+
+  // R32
+  html+=makePanel('lb-r32',false,allData,[
+    {label:'R32 Pts (3pts each)',fn:function(r){return r.r32;}},
+  ],'Round of 32 only — 3 pts per correct pick');
+
+  // R16
+  html+=makePanel('lb-r16',false,allData,[
+    {label:'R16 Pts (5pts each)',fn:function(r){return r.r16;}},
+  ],'Round of 16 only — 5 pts per correct pick');
+
+  // QF
+  html+=makePanel('lb-qf',false,allData,[
+    {label:'QF Pts (7pts each)',fn:function(r){return r.qf;}},
+  ],'Quarter-finals only — 7 pts per correct pick');
+
+  // SF
+  html+=makePanel('lb-sf',false,allData,[
+    {label:'SF Pts (10pts each)',fn:function(r){return r.sf;}},
+  ],'Semi-finals only — 10 pts per correct pick');
+
+  // Final
+  html+=makePanel('lb-fin',false,allData,[
+    {label:'Final Pts (17pts)',fn:function(r){return r.fin;}},
+  ],'Final only — 17 pts per correct pick');
+
   showMain(html);
+}
+
+function showLBTab(i){
+  var ids=['lb-overall','lb-groups','lb-r32','lb-r16','lb-qf','lb-sf','lb-fin'];
+  ids.forEach(function(id,j){
+    var p=document.getElementById(id);
+    var b=document.getElementById('lbtab_'+j);
+    if(p) p.style.display=j===i?'block':'none';
+    if(b){b.style.background=j===i?'#1a1a2e':'rgba(0,0,0,.1)';b.style.color=j===i?'#fff':'#555';}
+  });
 }
 
 // ─── PREDICTIONS SUMMARY ──────────────────────────────────────────────────
@@ -1337,12 +1471,19 @@ async function doImport(){
 
 // ─── ADMIN: LEADERBOARD ───────────────────────────────────────────────────
 function renderALB(){
-  var rows=GD.players.map(function(p){var n=pName(p);return Object.assign({name:n},score(n));}).sort(function(a,b){return b.total-a.total;});
+  var allData=GD.players.map(function(p){
+    var n=pName(p);var s=scoreByRound(n);
+    return {name:n,qual:s.qual,thirds:s.thirds,
+      r32:s.koByRound['Round of 32']||0,r16:s.koByRound['Round of 16']||0,
+      qf:s.koByRound['Quarter-finals']||0,sf:s.koByRound['Semi-finals']||0,
+      fin:s.koByRound['Final']||0,tw:s.tw,
+      total:s.qual+s.thirds+Object.values(s.koByRound).reduce(function(a,b){return a+b;},0)+s.tw};
+  }).sort(function(a,b){return b.total-a.total;});
   var html='<div class="lb-hdr"><h2>🏆 Leaderboard</h2><p>Live standings</p></div>'+
-    '<div class="lb-wrap"><table><thead><tr><th>#</th><th>Player</th><th>Qual</th><th>3rds</th><th>KO</th><th>Cup</th><th>Total</th></tr></thead><tbody>';
-  rows.forEach(function(p,r){
+    '<div class="lb-wrap"><table><thead><tr><th>#</th><th>Player</th><th>Qual</th><th>3rds</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>Total</th></tr></thead><tbody>';
+  allData.forEach(function(p,r){
     var cls=r===0?'r1':r===1?'r2':r===2?'r3':'ro';var medal=r===0?'🥇':r===1?'🥈':r===2?'🥉':r+1;
-    html+='<tr><td><span class="rank-badge '+cls+'">'+medal+'</span></td><td class="pname">'+p.name+(hasPreds(p.name)?'<span style="font-size:.6rem;color:var(--green);margin-left:3px">✓</span>':'')+'</td><td>'+p.qual+'</td><td>'+p.thirds+'</td><td>'+p.ko+'</td><td>'+p.tw+'</td><td class="tpts">'+p.total+'</td></tr>';
+    html+='<tr><td><span class="rank-badge '+cls+'">'+medal+'</span></td><td class="pname">'+p.name+(hasPreds(p.name)?'<span style="font-size:.6rem;color:var(--green);margin-left:3px">✓</span>':'')+'</td><td>'+p.qual+'</td><td>'+p.thirds+'</td><td>'+p.r32+'</td><td>'+p.r16+'</td><td>'+p.qf+'</td><td>'+p.sf+'</td><td>'+p.fin+'</td><td class="tpts">'+p.total+'</td></tr>';
   });
   el('alb').innerHTML=html+'</tbody></table></div>';
 }

@@ -501,7 +501,7 @@ async function ghWrite(data){
     r = await fetch(API,{
       method:'PUT',
       headers:{Authorization:'token '+ghToken,'Content-Type':'application/json'},
-      body:JSON.stringify({message:'Update '+new Date().toISOString(),content:btoa(bin),sha:ghSha})
+      body:JSON.stringify({message:'Update data [skip ci] '+new Date().toISOString(),content:btoa(bin),sha:ghSha})
     });
   }catch(networkErr){
     throw new Error('Network request to GitHub failed ('+networkErr.message+'). Your change was NOT saved — check your connection and try again.');
@@ -976,7 +976,7 @@ function renderPW(){
   if(!r16Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Cup Winner Locked</h3><p>Opens July 4 at 1:00 PM ET.</p></div>';return;}
   var opts='<option value="">— Pick the winner —</option>';
   ALL_TEAMS.forEach(function(t){opts+='<option value="'+t+'"'+(t===PP.tw?' selected':'')+'>'+t+'</option>';});
-  cont.innerHTML='<div class="psec"><div class="psec-hdr gold"><h3>🌍 Tournament Winner</h3><span class="pbadge">10 pts if correct</span></div>'+
+  cont.innerHTML='<div class="psec"><div class="psec-hdr gold"><h3>🌍 Tournament Winner</h3><span class="pbadge">17 pts if correct</span></div>'+
     '<div class="psec-body" style="text-align:center;padding:1.5rem">'+
     '<p style="font-size:.82rem;color:var(--gray-mid);margin-bottom:.9rem">Which team lifts the World Cup trophy?</p>'+
     '<select class="tw-big-sel" style="max-width:300px" onchange="PP.tw=this.value;el(\'twconf\').textContent=this.value?\'⚽ You picked: \'+this.value:\'\'">'+opts+'</select>'+
@@ -1743,6 +1743,7 @@ async function setAThird(i,val){
 // ─── ADMIN: KNOCKOUTS ─────────────────────────────────────────────────────
 function renderAKO(){
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
+  var KO_PTS_LABEL={'Round of 32':'3 pts','Round of 16':'5 pts','Quarter-finals':'7 pts','Semi-finals':'10 pts','3rd Place':'10 pts','Final':'17 pts'};
   var tabs='<div class="ko-tabs" id="akotabs">';
   KO_DEF.forEach(function(d){
     var act=d.k===curKO?' active':'';
@@ -1750,28 +1751,35 @@ function renderAKO(){
     tabs+='<button class="ko-tab '+d.tab+act+'" onclick="setAKO(\''+d.k+'\',this)">'+label+'</button>';
   });
   tabs+='</div><div class="mgrid" id="akogrid">'+akoCards(RCL)+'</div>';
-  el('ako').innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem"><h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🥊 Knockout Stage</h2><span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem">3 pts per correct winner</span></div>'+tabs;
+  el('ako').innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:.9rem"><h2 style="font-family:Bebas Neue,sans-serif;font-size:1.35rem;color:#fff;letter-spacing:1px">🥊 Knockout Stage</h2><span style="background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:20px;padding:2px 10px;font-size:.7rem" id="ako-pts-label">'+(KO_PTS_LABEL[curKO]||'3 pts')+' per correct winner</span></div>'+tabs;
 }
 
 function akoCards(RCL){
+  var KO_PTS_LABEL={'Round of 32':'3 pts','Round of 16':'5 pts','Quarter-finals':'7 pts','Semi-finals':'10 pts','3rd Place':'10 pts','Final':'17 pts'};
   var matches=KO_MATCHES.filter(function(m){return m.round===curKO;});
   return matches.map(function(m){
     var res=GD.koResults[m.id]||'';
+    var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.78rem;font-weight:700;color:#1a1a2e;margin:3px 0 5px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
     var prows=GD.players.map(function(p){
       var name=pName(p);var pred=((GD.predictions[name]||{}).ko||{})[m.id]||'';
       var cls=res&&pred?(pred.toLowerCase()===res.toLowerCase()?'correct':'wrong'):'';
       return '<div class="prow2"><span class="pp" title="'+name+'">'+name+'</span><span class="psel '+cls+'" style="flex:1;font-size:.76rem;font-weight:600;padding:4px 6px">'+pred+'</span></div>';
     }).join('');
+    // Use only the two scheduled teams for R32/R16, all teams for later rounds
+    var teamList=(m.teams&&m.teams.length===2)?m.teams:ALL_TEAMS;
     var ropts='<option value="">— result —</option>';
-    ALL_TEAMS.forEach(function(t){ropts+='<option value="'+t+'"'+(t===res?' selected':'')+'>'+t+'</option>';});
-    return '<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+'</div>'+prows+'<div class="arow"><span class="albl">Result</span><select class="asel" onchange="setAKORes(\''+m.id+'\',this.value)">'+ropts+'</select></div></div>';
+    teamList.forEach(function(t){ropts+='<option value="'+t+'"'+(t===res?' selected':'')+'>'+t+'</option>';});
+    var ptsLabel='<span style="font-size:.65rem;color:rgba(255,255,255,.6);margin-left:4px">'+( KO_PTS_LABEL[m.round]||'3 pts')+'</span>';
+    return '<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+(m.date?' · '+m.date:'')+ptsLabel+'</div>'+matchupTitle+prows+'<div class="arow"><span class="albl">Result</span><select class="asel" onchange="setAKORes(\''+m.id+'\',this.value)">'+ropts+'</select></div></div>';
   }).join('');
 }
 
 function setAKO(round,btn){
   curKO=round;
+  var KO_PTS_LABEL={'Round of 32':'3 pts','Round of 16':'5 pts','Quarter-finals':'7 pts','Semi-finals':'10 pts','3rd Place':'10 pts','Final':'17 pts'};
   document.querySelectorAll('#akotabs .ko-tab').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
+  var lbl=el('ako-pts-label');if(lbl)lbl.textContent=(KO_PTS_LABEL[round]||'3 pts')+' per correct winner';
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
   var g=el('akogrid');if(g)g.innerHTML=akoCards(RCL);
 }
@@ -1798,7 +1806,7 @@ function renderATW(){
     var cls=GD.twActual&&pred?(pred.toLowerCase()===GD.twActual.toLowerCase()?'correct':'wrong'):'';
     return '<div class="tw-card"><div class="tw-player"><div class="tw-av">'+initials(name)+'</div>'+name+'</div>'+
       '<div class="tw-sel '+cls+'" style="padding:6px;font-size:.82rem;font-weight:600">'+pred+'</div>'+
-      '<div class="tw-pts" style="color:'+(pts?'#1a6b3c':GD.twActual&&pred?'#c62828':'#888')+'">'+(GD.twActual&&pred?(pts?'✅ +10 pts':'❌ 0 pts'):'&nbsp;')+'</div></div>';
+      '<div class="tw-pts" style="color:'+(pts?'#1a6b3c':GD.twActual&&pred?'#c62828':'#888')+'">'+(GD.twActual&&pred?(pts?'✅ +17 pts':'❌ 0 pts'):'&nbsp;')+'</div></div>';
   }).join('');
   el('atw').innerHTML='<div class="tw-actual-wrap"><h3>🌍 Who Lifts the Trophy?</h3><p>Set the actual winner to award bonus points</p><select class="tw-big-sel" onchange="setATWActual(this.value)">'+opts+'</select></div>'+
     '<div class="tw-grid">'+cards+'</div>';

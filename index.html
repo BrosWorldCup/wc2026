@@ -376,6 +376,12 @@ const DEADLINE = new Date('2026-06-18T02:00:00Z'); // June 17 22:00 ET
 const R32_LOCK   = new Date('2026-06-28T19:00:00Z'); // June 28 15:00 ET — R32 locks
 const R16_UNLOCK = new Date('2026-07-03T01:00:00Z'); // July 3  21:00 ET — R16 opens
 const R16_LOCK   = new Date('2026-07-04T18:00:00Z'); // July 4  14:00 ET — R16 locks
+const QF_UNLOCK  = new Date('2026-07-07T23:00:00Z'); // July 7  19:00 ET — QF opens
+const QF_LOCK    = new Date('2026-07-09T20:00:00Z'); // July 9  16:00 ET — QF locks
+const SF_UNLOCK  = new Date('2026-07-12T04:00:00Z'); // July 12 00:00 ET — SF opens
+const SF_LOCK    = new Date('2026-07-14T20:00:00Z'); // July 14 16:00 ET — SF locks
+const FIN_UNLOCK = new Date('2026-07-15T22:00:00Z'); // July 15 18:00 ET — Final opens
+const FIN_LOCK   = new Date('2026-07-19T19:00:00Z'); // July 19 15:00 ET — Final locks
 
 // ─── STATIC DATA ──────────────────────────────────────────────────────────
 const GROUPS = {
@@ -431,6 +437,26 @@ const R16_FIXTURES = [
   {id:'ko_Round_of_16_7', label:'Match 7', date:'Jul 7',  teams:['Argentina','Egypt']},
   {id:'ko_Round_of_16_8', label:'Match 8', date:'Jul 7',  teams:['Switzerland','Colombia']},
 ];
+// ─── BRACKET PATH ─────────────────────────────────────────────────────────
+// Maps each QF/SF/Final match to the two R16/QF/SF matches whose winners feed it
+// Format: [feedMatchId1, feedMatchId2]
+const BRACKET_FEED = {
+  'ko_Quarter-finals_1': ['ko_Round_of_16_1','ko_Round_of_16_2'],   // W R16-1 vs W R16-2
+  'ko_Quarter-finals_2': ['ko_Round_of_16_3','ko_Round_of_16_4'],   // W R16-3 vs W R16-4
+  'ko_Quarter-finals_3': ['ko_Round_of_16_5','ko_Round_of_16_6'],   // W R16-5 vs W R16-6
+  'ko_Quarter-finals_4': ['ko_Round_of_16_7','ko_Round_of_16_8'],   // W R16-7 vs W R16-8
+  'ko_Semi-finals_1':    ['ko_Quarter-finals_1','ko_Quarter-finals_2'], // W QF1 vs W QF2
+  'ko_Semi-finals_2':    ['ko_Quarter-finals_3','ko_Quarter-finals_4'], // W QF3 vs W QF4
+  'ko_3rd_Place_1':      ['ko_Semi-finals_1','ko_Semi-finals_2'],    // Loser SF1 vs Loser SF2
+  'ko_Final_1':          ['ko_Semi-finals_1','ko_Semi-finals_2'],    // W SF1 vs W SF2
+};
+// For 3rd place, teams are the LOSERS not winners
+const BRACKET_LOSER = {'ko_3rd_Place_1': true};
+
+// QF/SF/Final dates
+const QF_DATES  = {'ko_Quarter-finals_1':'Jul 9','ko_Quarter-finals_2':'Jul 9','ko_Quarter-finals_3':'Jul 10','ko_Quarter-finals_4':'Jul 10'};
+const SF_DATES  = {'ko_Semi-finals_1':'Jul 13','ko_Semi-finals_2':'Jul 14'};
+
 const KO_MATCHES = [];
 R32_FIXTURES.forEach(function(f){
   KO_MATCHES.push({id:f.id,round:'Round of 32',label:f.label,date:f.date,teams:f.teams,cls:'kr32',tab:'r32'});
@@ -438,10 +464,53 @@ R32_FIXTURES.forEach(function(f){
 R16_FIXTURES.forEach(function(f){
   KO_MATCHES.push({id:f.id,round:'Round of 16',label:f.label,date:f.date,teams:f.teams,cls:'kr16',tab:'r16'});
 });
-KO_DEF.forEach(function(d){
-  if(d.k==='Round of 32'||d.k==='Round of 16') return;
-  for(var i=1;i<=d.n;i++) KO_MATCHES.push({id:'ko_'+d.k.replace(/\s/g,'_')+'_'+i,round:d.k,label:'Match '+i,cls:d.cls,tab:d.tab});
-});
+// QF
+for(var qi=1;qi<=4;qi++){
+  var qid='ko_Quarter-finals_'+qi;
+  KO_MATCHES.push({id:qid,round:'Quarter-finals',label:'Match '+qi,date:QF_DATES[qid]||'Jul 9',teams:[],cls:'kqf',tab:'qf',dynamic:true});
+}
+// SF
+for(var si=1;si<=2;si++){
+  var sid='ko_Semi-finals_'+si;
+  KO_MATCHES.push({id:sid,round:'Semi-finals',label:'Match '+si,date:SF_DATES[sid]||'Jul 13',teams:[],cls:'ksf',tab:'sf',dynamic:true});
+}
+// 3rd Place
+KO_MATCHES.push({id:'ko_3rd_Place_1',round:'3rd Place',label:'Match 1',date:'Jul 19',teams:[],cls:'ktp',tab:'tp',dynamic:true});
+// Final
+KO_MATCHES.push({id:'ko_Final_1',round:'Final',label:'Match 1',date:'Jul 19',teams:[],cls:'kf',tab:'f',dynamic:true});
+
+// Derive teams for a dynamic match from koResults
+function getMatchTeams(matchId, koResults){
+  var feeds=BRACKET_FEED[matchId];
+  if(!feeds) return [];
+  var isLoser=BRACKET_LOSER[matchId];
+  var teams=[];
+  feeds.forEach(function(feedId){
+    var winner=koResults[feedId]||'';
+    if(isLoser){
+      // Find the loser: get the two teams in the feed match, return the one that isn't the winner
+      var feedMatch=KO_MATCHES.find(function(m){return m.id===feedId;});
+      var feedTeams=feedMatch?getMatchTeams(feedId,koResults):[];
+      // For SF matches, feedTeams are dynamic too
+      if(feedTeams.length===2&&winner){
+        var loser=feedTeams.find(function(t){return t.toLowerCase()!==winner.toLowerCase();})||'';
+        teams.push(loser||'TBD');
+      } else {
+        teams.push('TBD');
+      }
+    } else {
+      teams.push(winner||'TBD');
+    }
+  });
+  return teams;
+}
+
+// Attach dynamic teams to KO_MATCHES using current koResults
+function refreshDynamicTeams(koResults){
+  KO_MATCHES.forEach(function(m){
+    if(m.dynamic) m.teams=getMatchTeams(m.id, koResults||{});
+  });
+}
 
 // Group stage fixtures: full round-robin within each group (6 matches × 12 groups = 72... 
 // actually standard WC26 format is 3 matchdays × 2 matches/group = 6 matches per group,
@@ -618,22 +687,52 @@ function score(name){
 
 // ─── TIME ─────────────────────────────────────────────────────────────────
 function isLocked(){return new Date()>=DEADLINE;}
-function r32Open(){return new Date()<R32_LOCK;}   // predictions still editable
-function r32Past(){return new Date()>=R32_LOCK;}   // deadline passed — view only
+function r32Open(){return new Date()<R32_LOCK;}
+function r32Past(){return new Date()>=R32_LOCK;}
 function r16Open(){return new Date()>=R16_UNLOCK&&new Date()<R16_LOCK;}
 function r16Past(){return new Date()>=R16_LOCK;}
+function qfOpen() {return new Date()>=QF_UNLOCK&&new Date()<QF_LOCK;}
+function qfPast() {return new Date()>=QF_LOCK;}
+function sfOpen() {return new Date()>=SF_UNLOCK&&new Date()<SF_LOCK;}
+function sfPast() {return new Date()>=SF_LOCK;}
+function finOpen(){return new Date()>=FIN_UNLOCK&&new Date()<FIN_LOCK;}
+function finPast(){return new Date()>=FIN_LOCK;}
+
 function koEditable(round){
-  if(round==='Round of 32') return r32Open();
-  if(round==='Round of 16') return r16Open();
+  if(round==='Round of 32')    return r32Open();
+  if(round==='Round of 16')    return r16Open();
+  if(round==='Quarter-finals') return qfOpen();
+  if(round==='Semi-finals')    return sfOpen();
+  if(round==='3rd Place')      return sfPast();
+  if(round==='Final')          return finOpen();
   return false;
 }
 function koVisible(round){
-  // always visible once R32 has opened (past deadline = read-only)
-  if(round==='Round of 32') return true;
-  if(round==='Round of 16') return r16Open()||r16Past();
+  if(round==='Round of 32')    return true;
+  if(round==='Round of 16')    return r16Open()||r16Past();
+  if(round==='Quarter-finals') return qfOpen()||qfPast();
+  if(round==='Semi-finals')    return sfOpen()||sfPast();
+  if(round==='3rd Place')      return sfPast();
+  if(round==='Final')          return finOpen()||finPast();
   return false;
 }
-function koOpen(round){ return koEditable(round); } // legacy alias
+function koOpen(round){ return koEditable(round); }
+
+function currentOpenRound(){
+  if(finOpen()) return 'Final';
+  if(sfOpen())  return 'Semi-finals';
+  if(qfOpen())  return 'Quarter-finals';
+  if(r16Open()) return 'Round of 16';
+  if(r32Open()) return 'Round of 32';
+  return null;
+}
+function latestVisibleRound(){
+  if(finOpen()||finPast()) return 'Final';
+  if(sfOpen()||sfPast())   return 'Semi-finals';
+  if(qfOpen()||qfPast())   return 'Quarter-finals';
+  if(r16Open()||r16Past()) return 'Round of 16';
+  return 'Round of 32';
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 function el(id){return document.getElementById(id);}
@@ -676,6 +775,7 @@ async function init(){
   if(!GD.groupResults) GD.groupResults={};
   if(!GD.qualActual) GD.qualActual={};
   syncQualActualFromResults();
+  refreshDynamicTeams(GD.koResults);
   var h=location.hash;
   if(isAdmin){
     location.hash='admin';
@@ -721,15 +821,19 @@ function showHome(){
   el('hsub').textContent='Prediction Game';el('pbadge').style.display='none';
   isAdmin=false;stopRefresh();
   var locked=isLocked();
-  var banner=r16Open()
-    ?'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">⚔️ <strong>Group stage &amp; Round of 32 predictions are closed.</strong> The Round of 16 is now open — submit your picks before <strong>1:00 PM ET on July 4</strong>!</div>'
-    :r16Past()
-      ?'<div style="background:#fff0f0;border:1px solid var(--red);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.8rem;color:var(--red);font-weight:600">🔒 Round of 16 predictions are locked — the deadline has passed.</div>'
-      :r32Open()
-        ?'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">🥊 <strong>Group stage predictions are closed.</strong> The Round of 32 is now open — submit your knockout picks before <strong>3:00 PM ET on June 28</strong>!</div>'
-        :(locked
-          ?'<div style="background:#fff0f0;border:1px solid var(--red);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.8rem;color:var(--red);font-weight:600">🔒 Group stage predictions are locked — the deadline has passed.</div>'
-          :'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">⏰ Predictions lock on <strong>June 17 at 10:00 PM ET</strong></div>');
+  var openRound=currentOpenRound();
+  var KO_BANNER={
+    'Quarter-finals':'🏆 <strong>Round of 16 predictions are closed.</strong> Quarter-finals picks are now open — submit before <strong>July 9 at 4:00 PM ET</strong>!',
+    'Semi-finals':   '🔥 <strong>Quarter-finals predictions are closed.</strong> Semi-finals picks are now open — submit before <strong>July 14 at 4:00 PM ET</strong>!',
+    'Final':         '⭐ <strong>Semi-finals predictions are closed.</strong> Final picks are now open — submit before <strong>July 19 at 3:00 PM ET</strong>!',
+    'Round of 16':   '⚔️ <strong>Group stage &amp; Round of 32 predictions are closed.</strong> Round of 16 picks are now open — submit before <strong>July 4 at 2:00 PM ET</strong>!',
+    'Round of 32':   '🥊 <strong>Group stage predictions are closed.</strong> Round of 32 picks are now open — submit before <strong>June 28 at 3:00 PM ET</strong>!',
+  };
+  var banner=openRound
+    ?'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">'+KO_BANNER[openRound]+'</div>'
+    :(locked
+      ?'<div style="background:#fff0f0;border:1px solid var(--red);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.8rem;color:var(--red);font-weight:600">🔒 Predictions are locked — the deadline has passed.</div>'
+      :'<div style="background:#fff8e7;border:1px solid var(--gold);border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#856404">⏰ Predictions lock on <strong>June 17 at 10:00 PM ET</strong></div>');
   var btns=GD.players.map(function(p){
     var name=pName(p);
     var pred=GD.predictions[name];
@@ -762,12 +866,13 @@ function showHome(){
 // ─── PLAYER LOGIN ─────────────────────────────────────────────────────────
 function loginAs(name){
   currentPlayer=name;isAdmin=false;curPKO=null;
+  refreshDynamicTeams(GD.koResults);
   var saved=GD.predictions[name];
   if(saved){PP.qual=saved.qual||{};PP.thirds=saved.thirds||{};PP.ko=saved.ko||{};PP.tw=saved.tw||'';}
   else{PP={qual:{},thirds:{},ko:{},tw:''};}
   el('hsub').textContent='Predictions for: '+name;
   el('pbadge').textContent='👤 '+name;el('pbadge').style.display='inline-block';
-  el('pnav').style.display='flex';el('sticky').style.display=(isLocked()&&!r32Open()&&!r16Open())?'none':'block';
+  el('pnav').style.display='flex';el('sticky').style.display=(isLocked()&&!currentOpenRound())?'none':'block';
   applyNavLock();
   showMain('<div style="padding-bottom:.5rem"><button class="back-btn" onclick="showHome()">← Back</button></div>'+
     '<div id="ppq" class="panel active"></div>'+
@@ -883,42 +988,31 @@ function renderPK(){
   var cont=el('ppk');if(!cont)return;
   var RCL={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
 
-  // Set default tab to the currently active round — only on first open (curPKO not yet set)
-  if(!curPKO){
-    if(r16Open()) curPKO='Round of 16';
-    else curPKO='Round of 32';
-  }
+  // Set default tab to the currently open round, or latest visible
+  if(!curPKO) curPKO = currentOpenRound() || latestVisibleRound();
 
-  var editable=koEditable(curPKO); // compute AFTER curPKO is finalised
+  var editable=koEditable(curPKO);
 
-  var r32matches=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
-  var r32total=r32matches.length;
-  var r32filled=r32matches.filter(function(m){return PP.ko[m.id];}).length;
-  var r32pct=Math.round(r32filled/r32total*100);
-  var r16matches=KO_MATCHES.filter(function(m){return m.round==='Round of 16';});
-  var r16total=r16matches.length;
-  var r16filled=r16matches.filter(function(m){return PP.ko[m.id];}).length;
-  var r16pct=Math.round(r16filled/r16total*100);
-  var alreadySubmittedR32=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r32matches.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
-  var alreadySubmittedR16=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r16matches.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
+  // Progress bar — only for the currently open round
+  var openRound=currentOpenRound();
+  var activeMatches=openRound?KO_MATCHES.filter(function(m){return m.round===openRound;}):[];
+  var activeTotal=activeMatches.length;
+  var activeFilled=activeMatches.filter(function(m){return PP.ko[m.id];}).length;
+  var activePct=activeTotal?Math.round(activeFilled/activeTotal*100):0;
+  var KO_PTS_LABEL={'Round of 32':'3 pts','Round of 16':'5 pts','Quarter-finals':'7 pts','Semi-finals':'10 pts','3rd Place':'10 pts','Final':'17 pts'};
+  var KO_COLOR={'Round of 32':'#c0392b','Round of 16':'#e67e22','Quarter-finals':'#8b1a1a','Semi-finals':'#5b21b6','3rd Place':'#555','Final':'#c9a84c'};
+  var alreadySubmitted=openRound&&!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&activeMatches.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
 
-  var isR32=(curPKO==='Round of 32');
-  var isR16=(curPKO==='Round of 16');
   var progressHtml='<div class="pintro" style="margin-bottom:.9rem">';
-  if(isR16&&r16Open()){
-    progressHtml+='<h2 style="color:var(--gold)">⚔️ Round of 16 Picks</h2>'+
-      '<p>Group stage &amp; Round of 32 predictions are closed. Pick the winner of each R16 match. <strong>5 pts</strong> per correct call.</p>'+
-      '<div class="pbar-wrap"><div class="pbar" style="width:'+r16pct+'%;background:#e67e22"></div></div>'+
-      '<div class="pbar-lbl">'+r16filled+' / '+r16total+' picks made'+(r16filled===r16total?' ✅ Complete!':'')+'</div>';
-    if(alreadySubmittedR16) progressHtml+='<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 16 predictions have been submitted.</div>';
-  } else if(isR32&&r32Open()){
-    progressHtml+='<h2 style="color:var(--gold)">🥊 Round of 32 Picks</h2>'+
-      '<p>Pick the winner of each match. <strong>3 pts</strong> per correct call.</p>'+
-      '<div class="pbar-wrap"><div class="pbar" style="width:'+r32pct+'%;background:#c0392b"></div></div>'+
-      '<div class="pbar-lbl">'+r32filled+' / '+r32total+' picks made'+(r32filled===r32total?' ✅ Complete!':'')+'</div>';
-    if(alreadySubmittedR32) progressHtml+='<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your Round of 32 predictions have been submitted.</div>';
+  if(openRound&&curPKO===openRound){
+    var col=KO_COLOR[openRound]||'#1a1a2e';
+    progressHtml+='<h2 style="color:var(--gold)">'+openRound+' Picks</h2>'+
+      '<p>Pick the winner of each match. <strong>'+KO_PTS_LABEL[openRound]+'</strong> per correct call.</p>'+
+      '<div class="pbar-wrap"><div class="pbar" style="width:'+activePct+'%;background:'+col+'"></div></div>'+
+      '<div class="pbar-lbl">'+activeFilled+' / '+activeTotal+' picks made'+(activeFilled===activeTotal?' ✅ Complete!':'')+'</div>';
+    if(alreadySubmitted) progressHtml+='<div style="margin-top:.5rem;padding:.5rem .9rem;background:#d4edda;border-radius:8px;font-size:.8rem;color:#1a6b3c;font-weight:600">✅ Your '+openRound+' predictions have been submitted.</div>';
   } else {
-    progressHtml+='<h2 style="color:var(--gold)">'+(isR16?'⚔️ Round of 16':isR32?'🥊 Round of 32':'🥊 '+curPKO)+' Picks</h2>'+
+    progressHtml+='<h2 style="color:var(--gold)">'+curPKO+' Picks</h2>'+
       '<div style="padding:.5rem .9rem;background:#fff8e7;border:1px solid var(--gold);border-radius:8px;font-size:.8rem;color:#856404">🔒 Predictions closed — viewing your picks (read-only)</div>';
   }
   progressHtml+='</div>';
@@ -943,16 +1037,20 @@ function renderPK(){
     var isCorrect=pred&&actual&&pred.toLowerCase()===actual.toLowerCase();
     var isWrong=pred&&actual&&!isCorrect;
     var dateStr=m.date?' <span style="font-size:.7rem;opacity:.7">· '+m.date+'</span>':'';
-    var matchupTitle=(m.teams&&m.teams.length===2)?'<div style="font-size:.95rem;font-weight:700;color:#1a1a2e;margin:5px 0 6px">'+m.teams[0]+' <span style="color:var(--gold)">vs</span> '+m.teams[1]+'</div>':'';
+    var teams=m.teams&&m.teams.length===2?m.teams:[];
+    var hasTBD=teams.some(function(t){return !t||t==='TBD';});
+    var matchupTitle=teams.length===2
+      ?'<div style="font-size:.95rem;font-weight:700;color:#1a1a2e;margin:5px 0 6px">'+teams[0]+' <span style="color:var(--gold)">vs</span> '+teams[1]+'</div>'
+      :'<div style="font-size:.85rem;color:#aaa;margin:5px 0 6px;font-style:italic">Teams TBD</div>';
     cardsHtml+='<div class="mc '+m.cls+'"><div class="mrl" style="color:'+RCL[m.round]+'">'+m.round+' · '+m.label+dateStr+'</div>'+matchupTitle;
-    if(editable){
+    if(editable&&!hasTBD){
       cardsHtml+='<select class="psel" style="width:100%;margin-top:4px" onchange="PP.ko[\''+m.id+'\']=this.value;renderPK()">'+
         '<option value="">— Pick winner —</option>';
-      var teamList=(m.teams&&m.teams.length)?m.teams:ALL_TEAMS;
-      teamList.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
+      teams.forEach(function(t){cardsHtml+='<option value="'+t+'"'+(t===pred?' selected':'')+'>'+t+'</option>';});
       cardsHtml+='</select>';
+    } else if(editable&&hasTBD){
+      cardsHtml+='<div style="margin-top:6px;padding:6px 10px;background:#f0f0f0;border-radius:6px;font-size:.82rem;color:#aaa">⏳ Waiting for previous results…</div>';
     } else {
-      // Read-only display
       var col=isCorrect?'#1a6b3c':isWrong?'#c62828':'#555';
       var bg2=isCorrect?'#d4edda':isWrong?'#fce8e8':'#f0f0f0';
       var icon=isCorrect?'✅ ':isWrong?'❌ ':'';
@@ -988,41 +1086,28 @@ function renderPW(){
 function renderPS(){
   var cont=el('pps');if(!cont)return;
   var tokHtml=!ghToken?'<div class="tok-box"><div class="tl">🎫 Game Token</div><p>Enter the token shared by the admin.</p><input type="text" id="tok" placeholder="Paste game token here…"></div>':'';
+  var KO_PTS_LABEL={'Round of 32':'3 pts','Round of 16':'5 pts','Quarter-finals':'7 pts','Semi-finals':'10 pts','Final':'17 pts'};
+  var KO_DEADLINE={'Round of 32':'June 28 at 3:00 PM ET','Round of 16':'July 4 at 2:00 PM ET','Quarter-finals':'July 9 at 4:00 PM ET','Semi-finals':'July 14 at 4:00 PM ET','Final':'July 19 at 3:00 PM ET'};
 
-  if(r16Open()){
-    var r16ms=KO_MATCHES.filter(function(m){return m.round==='Round of 16';});
-    var r16filled=r16ms.filter(function(m){return PP.ko[m.id];}).length;
-    var r16total=r16ms.length;
-    var allDone=r16filled===r16total;
-    var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r16ms.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
-    var errHtml=!allDone?'<div class="verr">⚠ Please pick a winner for all '+r16total+' Round of 16 matches ('+r16filled+'/'+r16total+' done).</div>':'';
+  var openRound=currentOpenRound();
+  if(openRound){
+    var ms=KO_MATCHES.filter(function(m){return m.round===openRound;});
+    var filled=ms.filter(function(m){return PP.ko[m.id];}).length;
+    var total=ms.length;
+    var allDone=filled===total;
+    var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&ms.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
+    var errHtml=!allDone?'<div class="verr">⚠ Please pick a winner for all '+total+' '+openRound+' matches ('+filled+'/'+total+' done).</div>':'';
     cont.innerHTML='<div class="sub-card">'+
-      '<h3>📤 Submit Round of 16 Picks</h3>'+
-      '<p>Group stage &amp; Round of 32 predictions are closed. Submit your <strong>Round of 16</strong> picks before <strong>July 4 at 1:00 PM ET</strong>.</p>'+
-      (alreadySubmitted?'<div style="margin:.75rem 0;padding:.65rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ You have already submitted Round of 16 picks — you can update them below.</div>':'')+
+      '<h3>📤 Submit '+openRound+' Picks</h3>'+
+      '<p>Submit your <strong>'+openRound+'</strong> picks before <strong>'+KO_DEADLINE[openRound]+'</strong>. '+KO_PTS_LABEL[openRound]+' per correct pick.</p>'+
+      (alreadySubmitted?'<div style="margin:.75rem 0;padding:.65rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ You have already submitted '+openRound+' picks — you can update them below.</div>':'')+
       errHtml+tokHtml+
-      '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(!allDone?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit Round of 16 Picks</button>'+
-      '<div id="subst" style="margin-top:.75rem;font-size:.82rem;font-weight:600;text-align:center"></div></div>';
-    return;
-  }
-  if(r32Open()){
-    var r32ms=KO_MATCHES.filter(function(m){return m.round==='Round of 32';});
-    var r32filled=r32ms.filter(function(m){return PP.ko[m.id];}).length;
-    var r32total=r32ms.length;
-    var allDone=r32filled===r32total;
-    var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].ko&&r32ms.some(function(m){return GD.predictions[currentPlayer].ko[m.id];}));
-    var errHtml=!allDone?'<div class="verr">⚠ Please pick a winner for all '+r32total+' Round of 32 matches ('+r32filled+'/'+r32total+' done).</div>':'';
-    cont.innerHTML='<div class="sub-card">'+
-      '<h3>📤 Submit Round of 32 Picks</h3>'+
-      '<p>Group stage predictions are closed. Submit your <strong>Round of 32</strong> picks before <strong>June 28 at 3:00 PM ET</strong>.</p>'+
-      (alreadySubmitted?'<div style="margin:.75rem 0;padding:.65rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ You have already submitted Round of 32 picks — you can update them below.</div>':'')+
-      errHtml+tokHtml+
-      '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(!allDone?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit Round of 32 Picks</button>'+
+      '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(!allDone?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit '+openRound+' Picks</button>'+
       '<div id="subst" style="margin-top:.75rem;font-size:.82rem;font-weight:600;text-align:center"></div></div>';
     return;
   }
   if(isLocked()){
-    cont.innerHTML='<div class="sub-card"><h3>🔒 Group Stage Predictions Locked</h3><p>The group stage deadline has passed.</p>'+(GD.predictions[currentPlayer]?'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ Your predictions were submitted.</div>':'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#fff0f0;border-radius:8px;font-size:.85rem;color:var(--red);font-weight:600">⚠️ No predictions were saved before the deadline.</div>')+'</div>';
+    cont.innerHTML='<div class="sub-card"><h3>🔒 Predictions Locked</h3><p>The current deadline has passed.</p>'+(GD.predictions[currentPlayer]?'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ Your predictions were submitted.</div>':'<div style="margin-top:.75rem;padding:.75rem 1rem;background:#fff0f0;border-radius:8px;font-size:.85rem;color:var(--red);font-weight:600">⚠️ No predictions were saved before the deadline.</div>')+'</div>';
     return;
   }
   var errs=validatePP();
@@ -1033,6 +1118,7 @@ function renderPS(){
     '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(errs.length?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit My Predictions</button>'+
     '<div id="subst" style="margin-top:.75rem;font-size:.82rem;font-weight:600;text-align:center"></div></div>';
 }
+
 
 function validatePP(){
   var errs=[];
@@ -1058,9 +1144,9 @@ async function doSubmit(){
       fresh.predictions[currentPlayer]={qual:PP.qual,thirds:PP.thirds,ko:PP.ko,tw:PP.tw};
     });
     var cont=el('pps');
-    var isR16=r16Open();var isR32=r32Open();
-    var msg=isR16?'Round of 16 Picks Saved!':isR32?'Round of 32 Picks Saved!':'Predictions Saved!';
-    var sub=isR16?'Your R16 picks are live. Deadline: July 4 at 1:00 PM ET.':isR32?'Your knockout picks are live. Deadline: June 28, 3:00 PM ET.':'Your picks are live.';
+    var openRound=currentOpenRound();
+    var msg=openRound?openRound+' Picks Saved!':'Predictions Saved!';
+    var sub=openRound?'Your picks are live for '+openRound+'.':'Your picks are live.';
     if(cont)cont.innerHTML='<div class="sub-ok"><div class="ck">✅</div><h3>'+msg+'</h3><p>'+sub+'</p><button class="btn btn-green" style="margin-top:1rem" onclick="showHome()">← Back to home</button></div>';
     el('sticky').style.display='none';
   }catch(e){
@@ -1786,6 +1872,7 @@ function setAKO(round,btn){
 
 async function setAKORes(mid,val){
   GD.koResults[mid]=val;
+  refreshDynamicTeams(GD.koResults);
   try{
     await safeWrite(function(fresh){
       if(!fresh.koResults)fresh.koResults={};

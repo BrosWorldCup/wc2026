@@ -837,14 +837,19 @@ function showHome(){
   var btns=GD.players.map(function(p){
     var name=pName(p);
     var pred=GD.predictions[name];
-    var sub;
-    if(r16Open()||r16Past()){
-      // Check R16 picks specifically
-      var r16ids=R16_FIXTURES.map(function(f){return f.id;});
-      var r16picks=pred&&pred.ko?r16ids.filter(function(id){return pred.ko[id];}).length:0;
-      sub=r16picks===r16ids.length&&r16picks>0;
-    } else if(r32Open()||r32Past()){
-      sub=!!(pred&&pred.ko&&Object.keys(pred.ko).length>0);
+    var sub=false;
+    var openRound=currentOpenRound();
+    if(openRound){
+      // Check if player has submitted picks for every match in the currently open round
+      var roundMatches=KO_MATCHES.filter(function(m){return m.round===openRound;});
+      var picks=pred&&pred.ko?roundMatches.filter(function(m){return pred.ko[m.id];}).length:0;
+      sub=picks===roundMatches.length&&picks>0;
+    } else if(r32Past()||r16Past()||qfPast()||sfPast()){
+      // Between rounds — show last completed round's submission status
+      var lastRound=latestVisibleRound();
+      var lastMatches=KO_MATCHES.filter(function(m){return m.round===lastRound;});
+      var lastPicks=pred&&pred.ko?lastMatches.filter(function(m){return pred.ko[m.id];}).length:0;
+      sub=lastPicks===lastMatches.length&&lastPicks>0;
     } else {
       sub=!!pred;
     }

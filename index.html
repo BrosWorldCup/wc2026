@@ -681,7 +681,7 @@ function score(name){
     var res=GD.koResults[m.id];
     if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) ko+=(KO_PTS[m.round]||3);
   });
-  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=10;
+  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=17;
   return {qual:qual,thirds:thirds,ko:ko,tw:tw,total:qual+thirds+ko+tw};
 }
 
@@ -713,18 +713,17 @@ function koVisible(round){
   if(round==='Quarter-finals') return qfOpen()||qfPast();
   if(round==='Semi-finals')    return sfOpen()||sfPast();
   if(round==='3rd Place')      return sfPast();
-  if(round==='Final')          return finOpen()||finPast();
+  if(round==='Final')          return false; // Final lives in Cup Winner tab
   return false;
 }
 function koOpen(round){ return koEditable(round); }
 
 function currentOpenRound(){
-  if(finOpen()) return 'Final';
   if(sfOpen())  return 'Semi-finals';
   if(qfOpen())  return 'Quarter-finals';
   if(r16Open()) return 'Round of 16';
   if(r32Open()) return 'Round of 32';
-  return null;
+  return null; // Final handled separately in Cup Winner tab
 }
 function latestVisibleRound(){
   if(finOpen()||finPast()) return 'Final';
@@ -877,7 +876,7 @@ function loginAs(name){
   else{PP={qual:{},thirds:{},ko:{},tw:''};}
   el('hsub').textContent='Predictions for: '+name;
   el('pbadge').textContent='👤 '+name;el('pbadge').style.display='inline-block';
-  el('pnav').style.display='flex';el('sticky').style.display=(isLocked()&&!currentOpenRound())?'none':'block';
+  el('pnav').style.display='flex';el('sticky').style.display=(isLocked()&&!currentOpenRound()&&!finOpen())?'none':'block';
   applyNavLock();
   showMain('<div style="padding-bottom:.5rem"><button class="back-btn" onclick="showHome()">← Back</button></div>'+
     '<div id="ppq" class="panel active"></div>'+
@@ -894,14 +893,14 @@ function applyNavLock(){
   if(pkb){pkb.classList.remove('locked');pkb.removeAttribute('disabled');}
   // R16+ tab: only accessible once R16 opens or has passed
   if(pwb){
-    if(r16Open()||r16Past()){pwb.classList.remove('locked');pwb.removeAttribute('disabled');}
+    if(sfPast()||finOpen()||finPast()){pwb.classList.remove('locked');pwb.removeAttribute('disabled');}
     else{pwb.classList.add('locked');}
   }
 }
 
 // ─── PLAYER TABS ──────────────────────────────────────────────────────────
 function showPTab(tab,btn){
-  if(tab==='ppw'&&!r16Open()&&!r16Past()) return;
+  if(tab==='ppw'&&!finOpen()&&!finPast()&&!sfPast()) return;
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('#pnav button').forEach(function(b){b.classList.remove('active');});
   var e=el(tab);if(!e)return;
@@ -1076,15 +1075,52 @@ function setPKO(round,btn){
 // ─── PLAYER: CUP WINNER ───────────────────────────────────────────────────
 function renderPW(){
   var cont=el('ppw');if(!cont)return;
-  if(!r16Open()){cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Cup Winner Locked</h3><p>Opens July 4 at 1:00 PM ET.</p></div>';return;}
-  var opts='<option value="">— Pick the winner —</option>';
-  ALL_TEAMS.forEach(function(t){opts+='<option value="'+t+'"'+(t===PP.tw?' selected':'')+'>'+t+'</option>';});
-  cont.innerHTML='<div class="psec"><div class="psec-hdr gold"><h3>🌍 Tournament Winner</h3><span class="pbadge">17 pts if correct</span></div>'+
-    '<div class="psec-body" style="text-align:center;padding:1.5rem">'+
-    '<p style="font-size:.82rem;color:var(--gray-mid);margin-bottom:.9rem">Which team lifts the World Cup trophy?</p>'+
-    '<select class="tw-big-sel" style="max-width:300px" onchange="PP.tw=this.value;el(\'twconf\').textContent=this.value?\'⚽ You picked: \'+this.value:\'\'">'+opts+'</select>'+
-    '<div id="twconf" style="margin-top:.6rem;font-size:.85rem;color:var(--green);font-weight:600">'+(PP.tw?'⚽ You picked: '+PP.tw:'')+'</div>'+
-    '</div></div>';
+  // Get finalists from SF results
+  var sf1winner=(GD.koResults||{})['ko_Semi-finals_1']||'';
+  var sf2winner=(GD.koResults||{})['ko_Semi-finals_2']||'';
+  var finalists=sf1winner&&sf2winner?[sf1winner,sf2winner]:[];
+  var isEditable=finOpen();
+  var isPast=finPast();
+
+  if(!isEditable&&!isPast){
+    // Not yet open
+    var openMsg=sf1winner&&sf2winner
+      ?'<p style="font-size:.85rem;color:var(--gray-mid)">The Final will be <strong>'+sf1winner+' vs '+sf2winner+'</strong>.<br>Predictions open July 15 at 6:00 PM ET.</p>'
+      :'<p style="font-size:.85rem;color:var(--gray-mid)">Opens July 15 at 6:00 PM ET once the finalists are confirmed.</p>';
+    cont.innerHTML='<div class="locked-msg"><div class="li">🔒</div><h3>Final Prediction Locked</h3>'+openMsg+'</div>';
+    return;
+  }
+
+  var matchupTitle=finalists.length===2
+    ?'<div style="font-size:1.1rem;font-weight:700;color:#1a1a2e;margin:.75rem 0">'+finalists[0]+' <span style="color:var(--gold)">vs</span> '+finalists[1]+'</div>'
+    :'<div style="font-size:.85rem;color:#aaa;margin:.75rem 0;font-style:italic">Finalists TBD</div>';
+
+  if(isEditable&&finalists.length===2){
+    var opts='<option value="">— Pick the winner —</option>';
+    finalists.forEach(function(t){opts+='<option value="'+t+'"'+(t===PP.tw?' selected':'')+'>'+t+'</option>';});
+    cont.innerHTML='<div class="psec"><div class="psec-hdr gold"><h3>🏆 Final Prediction</h3><span class="pbadge">17 pts if correct</span></div>'+
+      '<div class="psec-body" style="text-align:center;padding:1.5rem">'+
+      '<p style="font-size:.82rem;color:var(--gray-mid);margin-bottom:.5rem">Who wins the World Cup?</p>'+
+      matchupTitle+
+      '<select class="tw-big-sel" style="max-width:300px;margin-top:.5rem" onchange="PP.tw=this.value;el(\'twconf\').textContent=this.value?\'⚽ You picked: \'+this.value:\'\'">'+opts+'</select>'+
+      '<div id="twconf" style="margin-top:.6rem;font-size:.85rem;color:var(--green);font-weight:600">'+(PP.tw?'⚽ You picked: '+PP.tw:'')+'</div>'+
+      '</div></div>';
+  } else if(isEditable&&finalists.length===0){
+    cont.innerHTML='<div class="locked-msg"><div class="li">⏳</div><h3>Finalists Not Yet Known</h3><p style="font-size:.85rem;color:var(--gray-mid)">Waiting for semi-final results to be entered.</p></div>';
+  } else {
+    // Past — read only
+    var pred=PP.tw||'';
+    var actual=GD.twActual||'';
+    var isCorrect=pred&&actual&&pred.toLowerCase()===actual.toLowerCase();
+    var col=isCorrect?'#1a6b3c':pred&&actual?'#c62828':'#555';
+    var bg2=isCorrect?'#d4edda':pred&&actual?'#fce8e8':'#f0f0f0';
+    cont.innerHTML='<div class="psec"><div class="psec-hdr gold"><h3>🏆 Final Prediction</h3><span class="pbadge">17 pts</span></div>'+
+      '<div class="psec-body" style="text-align:center;padding:1.5rem">'+
+      matchupTitle+
+      '<div style="margin-top:8px;padding:8px 14px;background:'+bg2+';border-radius:8px;font-size:.95rem;font-weight:700;color:'+col+'">'+(pred?(isCorrect?'✅ ':'❌ ')+pred:'— No pick —')+'</div>'+
+      (actual?'<div style="font-size:.75rem;color:#888;margin-top:6px">Winner: <strong>'+actual+'</strong></div>':'')+
+      '</div></div>';
+  }
 }
 
 // ─── PLAYER: SUBMIT ───────────────────────────────────────────────────────
@@ -1095,6 +1131,22 @@ function renderPS(){
   var KO_DEADLINE={'Round of 32':'June 28 at 3:00 PM ET','Round of 16':'July 4 at 2:00 PM ET','Quarter-finals':'July 9 at 4:00 PM ET','Semi-finals':'July 14 at 4:00 PM ET','Final':'July 19 at 3:00 PM ET'};
 
   var openRound=currentOpenRound();
+
+  // Handle Final (Cup Winner tab) separately
+  if(finOpen()){
+    var hasPick=!!(PP.tw);
+    var alreadySubmitted=!!(GD.predictions[currentPlayer]&&GD.predictions[currentPlayer].tw);
+    cont.innerHTML='<div class="sub-card">'+
+      '<h3>📤 Submit Final Pick</h3>'+
+      '<p>Submit your <strong>Final</strong> pick before <strong>July 19 at 3:00 PM ET</strong>. 17 pts if correct.</p>'+
+      (alreadySubmitted?'<div style="margin:.75rem 0;padding:.65rem 1rem;background:#d4edda;border-radius:8px;font-size:.85rem;color:#1a6b3c;font-weight:600">✅ You have already submitted your Final pick — you can update it below.</div>':'')+
+      (!hasPick?'<div class="verr">⚠ Please pick a winner in the 🌍 Cup Winner tab first.</div>':'')+
+      tokHtml+
+      '<button class="btn btn-gold btn-full" style="font-size:.95rem;padding:.8rem" onclick="doSubmit()" '+(!hasPick?'disabled style="opacity:.5;cursor:not-allowed;font-size:.95rem;padding:.8rem"':'')+'>✅ Submit Final Pick</button>'+
+      '<div id="subst" style="margin-top:.75rem;font-size:.82rem;font-weight:600;text-align:center"></div></div>';
+    return;
+  }
+
   if(openRound){
     var ms=KO_MATCHES.filter(function(m){return m.round===openRound;});
     var filled=ms.filter(function(m){return PP.ko[m.id];}).length;
@@ -1184,7 +1236,7 @@ function scoreByRound(name){
     if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) koByRound[m.round]+=(KO_PTS[m.round]||3);
   });
   var tw=0;
-  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=10;
+  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=17;
   return {qual,thirds,koByRound,tw};
 }
 

@@ -703,7 +703,7 @@ function koEditable(round){
   if(round==='Round of 16')    return r16Open();
   if(round==='Quarter-finals') return qfOpen();
   if(round==='Semi-finals')    return sfOpen();
-  if(round==='3rd Place')      return sfPast();
+  if(round==='3rd Place')      return sfPast()&&!finOpen()&&!finPast(); // open between SF end and Final open
   if(round==='Final')          return finOpen();
   return false;
 }
@@ -713,7 +713,7 @@ function koVisible(round){
   if(round==='Quarter-finals') return qfOpen()||qfPast();
   if(round==='Semi-finals')    return sfOpen()||sfPast();
   if(round==='3rd Place')      return sfPast();
-  if(round==='Final')          return false; // Final lives in Cup Winner tab
+  if(round==='Final')          return false; // Final lives in Cup Winner tab — never show here
   return false;
 }
 function koOpen(round){ return koEditable(round); }
@@ -1032,12 +1032,13 @@ function renderPK(){
   }
   progressHtml+='</div>';
 
-  // Round tabs
+  // Round tabs — skip Final (lives in Cup Winner tab)
   var tabsHtml='<div class="ko-tabs" id="pkotabs">';
   KO_DEF.forEach(function(d){
+    if(d.k==='Final') return; // Final lives in Cup Winner tab
     var visible=koVisible(d.k);
     var act=d.k===curPKO?' active':'';
-    var label=d.k==='Final'?'⭐ Final':d.k==='3rd Place'?'3rd':d.k;
+    var label=d.k==='3rd Place'?'3rd':d.k;
     if(!visible) tabsHtml+='<button class="ko-tab '+d.tab+'" disabled style="opacity:.35;cursor:not-allowed">'+label+' 🔒</button>';
     else tabsHtml+='<button class="ko-tab '+d.tab+act+'" onclick="setPKO(\''+d.k+'\',this)">'+label+'</button>';
   });
@@ -1295,6 +1296,7 @@ function showLB(){
     {id:'lb-r16',     label:'⚔️ Round of 16', pts:'5 pts per correct pick'},
     {id:'lb-qf',      label:'🏆 Quarter-finals', pts:'7 pts per correct pick'},
     {id:'lb-sf',      label:'🔥 Semi-finals', pts:'10 pts per correct pick'},
+    {id:'lb-3rd',     label:'🥉 3rd Place', pts:'10 pts per correct pick'},
     {id:'lb-fin',     label:'⭐ Final', pts:'17 pts per correct pick'},
   ];
 
@@ -1329,6 +1331,7 @@ function showLB(){
     {label:'R16',    fn:function(r){return r.r16;}},
     {label:'QF',     fn:function(r){return r.qf;}},
     {label:'SF',     fn:function(r){return r.sf;}},
+    {label:'3rd',    fn:function(r){return r.koByRound['3rd Place']||0;}},
     {label:'Final',  fn:function(r){return r.fin;}},
   ],'Combined score across all rounds');
 
@@ -1358,6 +1361,10 @@ function showLB(){
     {label:'SF Pts (10pts each)',fn:function(r){return r.sf;}},
   ],'Semi-finals only — 10 pts per correct pick');
 
+  html+=makePanel('lb-3rd',false,allData,[
+    {label:'3rd Place (10pts)',fn:function(r){return r.koByRound['3rd Place']||0;}},
+  ],'3rd Place match only — 10 pts per correct pick');
+
   // Final
   html+=makePanel('lb-fin',false,allData,[
     {label:'Final Pts (17pts)',fn:function(r){return r.fin;}},
@@ -1367,7 +1374,7 @@ function showLB(){
 }
 
 function showLBTab(i){
-  var ids=['lb-overall','lb-groups','lb-r32','lb-r16','lb-qf','lb-sf','lb-fin'];
+  var ids=['lb-overall','lb-groups','lb-r32','lb-r16','lb-qf','lb-sf','lb-3rd','lb-fin'];
   ids.forEach(function(id,j){
     var p=document.getElementById(id);
     var b=document.getElementById('lbtab_'+j);
@@ -1442,6 +1449,7 @@ function showSummary(){
     {key:'Round of 16',    color:'#e67e22', label:'⚔️ R16'},
     {key:'Quarter-finals', color:'#8b1a1a', label:'🏆 QF'},
     {key:'Semi-finals',    color:'#5b21b6', label:'🔥 SF'},
+    {key:'3rd Place',      color:'#555',    label:'🥉 3rd'},
   ];
   function buildKoRoundTable(roundKey, color){
     var ms=KO_MATCHES.filter(function(m){return m.round===roundKey;});
@@ -2323,8 +2331,8 @@ function renderBracket(){
 }
 
 function showKoSumTab(i){
-  var colors=['#c0392b','#e67e22','#8b1a1a','#5b21b6'];
-  for(var j=0;j<4;j++){
+  var colors=['#c0392b','#e67e22','#8b1a1a','#5b21b6','#555'];
+  for(var j=0;j<5;j++){
     var p=document.getElementById('ko-sum-panel-'+j);
     var b=document.getElementById('kosumtab_'+j);
     if(p) p.style.display=j===i?'block':'none';

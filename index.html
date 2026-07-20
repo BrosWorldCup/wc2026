@@ -677,11 +677,15 @@ function score(name){
   });
   var KO_PTS={'Round of 32':3,'Round of 16':5,'Quarter-finals':7,'Semi-finals':10,'3rd Place':10,'Final':17};
   KO_MATCHES.forEach(function(m){
+    if(m.round==='Final') return; // Final scored via tw field only
     var pred=((p.ko||{})[m.id]);
     var res=GD.koResults[m.id];
     if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) ko+=(KO_PTS[m.round]||3);
   });
-  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=17;
+  var twPick=(p.tw||'').toLowerCase();
+  var koFinalPick=((p.ko||{})['ko_Final_1']||'').toLowerCase();
+  var twActual=(GD.twActual||'').toLowerCase();
+  if(twActual&&(twPick===twActual||koFinalPick===twActual)) tw=17;
   return {qual:qual,thirds:thirds,ko:ko,tw:tw,total:qual+thirds+ko+tw};
 }
 
@@ -1242,13 +1246,18 @@ function scoreByRound(name){
   var KO_PTS={'Round of 32':3,'Round of 16':5,'Quarter-finals':7,'Semi-finals':10,'3rd Place':10,'Final':17};
   var koByRound={};
   KO_MATCHES.forEach(function(m){
+    if(m.round==='Final') return; // Final scored via tw field only — skip to avoid double-counting
     var pred=((p.ko||{})[m.id]);
     var res=(GD.koResults||{})[m.id];
     if(!koByRound[m.round]) koByRound[m.round]=0;
     if(res&&pred&&pred.toLowerCase()===res.toLowerCase()) koByRound[m.round]+=(KO_PTS[m.round]||3);
   });
   var tw=0;
-  if(GD.twActual&&(p.tw||'').toLowerCase()===GD.twActual.toLowerCase()) tw=17;
+  // Check tw (Cup Winner tab pick) OR ko_Final_1 (old Final KO pick) — whichever matches
+  var twPick=(p.tw||'').toLowerCase();
+  var koFinalPick=((p.ko||{})['ko_Final_1']||'').toLowerCase();
+  var twActual=(GD.twActual||'').toLowerCase();
+  if(twActual&&(twPick===twActual||koFinalPick===twActual)) tw=17;
   return {qual,thirds,koByRound,tw};
 }
 
@@ -1278,12 +1287,15 @@ function showLB(){
   var allData=GD.players.map(function(p){
     var n=pName(p);
     var s=scoreByRound(n);
+    // fin = points from ko_Final_1 OR from tw (cup winner pick) — whichever gave points
+    var finPts=(s.koByRound['Final']||0)+(s.tw||0);
     return {name:n, qual:s.qual, thirds:s.thirds, koByRound:s.koByRound, tw:s.tw,
       r32:s.koByRound['Round of 32']||0,
       r16:s.koByRound['Round of 16']||0,
       qf:s.koByRound['Quarter-finals']||0,
       sf:s.koByRound['Semi-finals']||0,
-      fin:s.koByRound['Final']||0,
+      thirdMatch:s.koByRound['3rd Place']||0,
+      fin:finPts,
       total:(s.qual+s.thirds+Object.values(s.koByRound).reduce(function(a,b){return a+b;},0)+s.tw)
     };
   });
@@ -1331,7 +1343,7 @@ function showLB(){
     {label:'R16',    fn:function(r){return r.r16;}},
     {label:'QF',     fn:function(r){return r.qf;}},
     {label:'SF',     fn:function(r){return r.sf;}},
-    {label:'3rd',    fn:function(r){return r.koByRound['3rd Place']||0;}},
+    {label:'3rd',    fn:function(r){return r.thirdMatch;}},
     {label:'Final',  fn:function(r){return r.fin;}},
   ],'Combined score across all rounds');
 
@@ -1362,7 +1374,7 @@ function showLB(){
   ],'Semi-finals only — 10 pts per correct pick');
 
   html+=makePanel('lb-3rd',false,allData,[
-    {label:'3rd Place (10pts)',fn:function(r){return r.koByRound['3rd Place']||0;}},
+    {label:'3rd Place (10pts)',fn:function(r){return r.thirdMatch;}},
   ],'3rd Place match only — 10 pts per correct pick');
 
   // Final
@@ -1501,7 +1513,8 @@ function showSummary(){
     '<th style="text-align:left;padding-left:.9rem">Player</th>'+
     '<th>Picked Winner</th><th>Points</th></tr></thead><tbody>';
   players.forEach(function(name,ni){
-    var tw=(GD.predictions[name]||{}).tw||'';
+    var pred=GD.predictions[name]||{};
+    var tw=pred.tw||(pred.ko||{})['ko_Final_1']||'';
     var isCorrect=tw&&GD.twActual&&tw.toLowerCase()===GD.twActual.toLowerCase();
     var isWrong=tw&&GD.twActual&&!isCorrect;
     var bg=ni%2===0?'#fff':'#f9f9f7';
@@ -1510,7 +1523,7 @@ function showSummary(){
       '<td style="padding:7px 8px;text-align:center;font-weight:600;font-size:.82rem;color:'+(isCorrect?'#1a6b3c':isWrong?'#c62828':'var(--gray-dark)')+'">'+
         (tw||(GD.twActual?'—':'?'))+'</td>'+
       '<td style="padding:7px 8px;text-align:center;font-weight:700;color:'+(isCorrect?'#1a6b3c':'var(--gray-mid)')+'">'+
-        (isCorrect?'✅ 10 pts':isWrong?'❌ 0 pts':'—')+'</td></tr>';
+        (isCorrect?'✅ 17 pts':isWrong?'❌ 0 pts':'—')+'</td></tr>';
   });
   if(GD.twActual){twHtml+='<tr style="background:var(--gold-light)"><td style="padding:7px .9rem;font-weight:700;font-size:.8rem;color:var(--gold)">✅ Actual Winner</td><td style="padding:7px 8px;text-align:center;font-weight:700;color:var(--green)">'+GD.twActual+'</td><td></td></tr>';}
   twHtml+='</tbody></table></div></div>';
